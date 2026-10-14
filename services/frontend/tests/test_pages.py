@@ -106,6 +106,15 @@ def test_detail_affiche_le_classement_et_l_equipe(api):
     )
 
 
+def test_equipe_absente_est_signalee(monkeypatch):
+    sans_equipe = TOURNAMENT | {
+        "standings": [TOURNAMENT["standings"][0] | {"team": []}]
+    }
+    responses = {"http://api/api/tournaments/1?top=16": sans_equipe}
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
+    assert "équipe non publiée" in client.get("/tournaments/1").text
+
+
 def test_tournoi_inconnu_renvoie_404(api):
     assert client.get("/tournaments/999").status_code == 404
 
