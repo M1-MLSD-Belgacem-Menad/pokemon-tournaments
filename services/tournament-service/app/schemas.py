@@ -96,3 +96,26 @@ class LocalTournament(BaseModel):
         if self.player_count is not None and self.player_count < n:
             raise ValueError("moins de participants que de joueurs classés")
         return self
+
+
+STATS = ("hp", "atk", "def", "spa", "spd", "spe")  # ordre des statistiques de base
+
+
+class PokemonInfo(BaseModel):
+    name: Name
+    types: list[Name] = Field(min_length=1, max_length=2)
+    stats: list[int] = Field(min_length=6, max_length=6)  # dans l'ordre de STATS
+
+
+class MoveInfo(BaseModel):
+    name: Name
+    type: Name
+    category: Literal["physical", "special", "status"]
+    power: int | None = Field(default=None, ge=1)  # None : attaque de statut
+
+
+class Enrichment(BaseModel):
+    """Données PokéAPI envoyées par `scraper.py enrich` pour les noms déjà en base."""
+
+    pokemon: list[PokemonInfo] = []
+    moves: list[MoveInfo] = []

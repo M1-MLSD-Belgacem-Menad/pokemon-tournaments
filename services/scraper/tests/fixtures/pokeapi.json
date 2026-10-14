@@ -1,0 +1,153 @@
+{
+ "pokemon/rotom-wash": {
+  "name": "rotom-wash",
+  "types": [
+   {
+    "slot": 1,
+    "type": {
+     "name": "electric",
+     "url": "/api/v2/type/13/"
+    }
+   },
+   {
+    "slot": 2,
+    "type": {
+     "name": "water",
+     "url": "/api/v2/type/11/"
+    }
+   }
+  ],
+  "stats": [
+   {
+    "base_stat": 50,
+    "stat": {
+     "name": "hp"
+    }
+   },
+   {
+    "base_stat": 65,
+    "stat": {
+     "name": "attack"
+    }
+   },
+   {
+    "base_stat": 107,
+    "stat": {
+     "name": "defense"
+    }
+   },
+   {
+    "base_stat": 105,
+    "stat": {
+     "name": "special-attack"
+    }
+   },
+   {
+    "base_stat": 107,
+    "stat": {
+     "name": "special-defense"
+    }
+   },
+   {
+    "base_stat": 86,
+    "stat": {
+     "name": "speed"
+    }
+   }
+  ]
+ },
+ "pokemon/aegislash-shield": {
+  "name": "aegislash-shield",
+  "types": [
+   {
+    "slot": 1,
+    "type": {
+     "name": "steel",
+     "url": "/api/v2/type/9/"
+    }
+   },
+   {
+    "slot": 2,
+    "type": {
+     "name": "ghost",
+     "url": "/api/v2/type/8/"
+    }
+   }
+  ],
+  "stats": [
+   {
+    "base_stat": 60,
+    "stat": {
+     "name": "hp"
+    }
+   },
+   {
+    "base_stat": 50,
+    "stat": {
+     "name": "attack"
+    }
+   },
+   {
+    "base_stat": 140,
+    "stat": {
+     "name": "defense"
+    }
+   },
+   {
+    "base_stat": 50,
+    "stat": {
+     "name": "special-attack"
+    }
+   },
+   {
+    "base_stat": 140,
+    "stat": {
+     "name": "special-defense"
+    }
+   },
+   {
+    "base_stat": 60,
+    "stat": {
+     "name": "speed"
+    }
+   }
+  ]
+ },
+ "pokemon-species/aegislash": {
+  "name": "aegislash",
+  "varieties": [
+   {
+    "is_default": true,
+    "pokemon": {
+     "name": "aegislash-shield"
+    }
+   },
+   {
+    "is_default": false,
+    "pokemon": {
+     "name": "aegislash-blade"
+    }
+   }
+  ]
+ },
+ "move/kings-shield": {
+  "name": "kings-shield",
+  "type": {
+   "name": "steel"
+  },
+  "damage_class": {
+   "name": "status"
+  },
+  "power": null
+ },
+ "move/u-turn": {
+  "name": "u-turn",
+  "type": {
+   "name": "bug"
+  },
+  "damage_class": {
+   "name": "physical"
+  },
+  "power": 70
+ }
+}

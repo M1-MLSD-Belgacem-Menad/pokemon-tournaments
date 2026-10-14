@@ -28,6 +28,20 @@
 </form>
 
 {% if stats is defined %}
+<h2>Statistiques de base</h2>
+<table>
+  <thead><tr><th>Pokémon</th><th>Types</th><th>PV</th><th>Att.</th><th>Déf.</th><th>Att. Spé.</th><th>Déf. Spé.</th><th>Vit.</th><th>Total</th></tr></thead>
+  <tbody>
+  {% for name in chosen %}{% set p = info.get(name, {}) %}
+    <tr>
+      <td>{{ name }}</td>
+      <td>{% for ty in p.types or [] %}<span class="type">{{ ty | type_fr }}</span>{% endfor %}</td>
+      {% if p.stats %}{% for v in p.stats.values() %}<td class="num">{{ v }}</td>{% endfor %}<td class="num">{{ p.stats.values() | sum }}</td>
+      {% else %}<td colspan="7" class="meta">pas encore chargées depuis PokéAPI</td>{% endif %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
 <h2>Winrate de chaque Pokémon</h2>
 <table>
   <thead><tr><th>Pokémon</th><th>Équipes</th><th>Bilan</th><th>Winrate</th><th>Matchups les plus fréquents</th></tr></thead>

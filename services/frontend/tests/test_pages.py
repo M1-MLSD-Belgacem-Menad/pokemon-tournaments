@@ -34,9 +34,35 @@ TOURNAMENT = {
                     "name": "Staraptor",
                     "item": "Staraptite",
                     "ability": "Intimidate",
-                    "moves": ["Brave Bird", "Close Combat", "Tailwind", "Protect"],
+                    "types": ["normal", "flying"],
+                    "moves": [
+                        {
+                            "name": "Brave Bird",
+                            "type": "flying",
+                            "category": "physical",
+                            "power": 120,
+                        },
+                        {
+                            "name": "Close Combat",
+                            "type": None,  # pas encore enrichie par PokéAPI
+                            "category": None,
+                            "power": None,
+                        },
+                        {
+                            "name": "Tailwind",
+                            "type": "flying",
+                            "category": "status",
+                            "power": None,
+                        },
+                    ],
                 },
-                {"name": "Indeedee ♀", "item": None, "ability": None, "moves": []},
+                {
+                    "name": "Indeedee ♀",
+                    "item": None,
+                    "ability": None,
+                    "types": [],
+                    "moves": [],
+                },
             ],
         }
     ],
@@ -104,6 +130,12 @@ def test_detail_affiche_le_classement_et_l_equipe(api):
         and "Intimidate" in resp.text
         and "Tailwind" in resp.text
     )
+    assert '<span class="type">Vol</span>' in resp.text  # types en français
+    assert "Brave Bird <span" in resp.text and "(Vol, physique, 120)" in resp.text
+    assert "(Vol, statut)" in resp.text  # pas de puissance
+    assert (
+        "Close Combat</li>" in resp.text
+    )  # sans détails tant qu'elle n'est pas enrichie
 
 
 def test_equipe_absente_est_signalee(monkeypatch):
@@ -339,6 +371,16 @@ def stats_api(monkeypatch):
             {"opponent": "Z", "games": 5, "wins": 5, "losses": 0, "winrate": 1.0}
         ],
         "http://api/api/stats/matchups?format=F1&pokemon=Y&limit=5": [],
+        "http://api/api/pokemon?pokemon=X&pokemon=Y": [
+            {
+                "name": "X",
+                "types": ["water"],
+                "stats": dict(
+                    zip(["hp", "atk", "def", "spa", "spd", "spe"], [1, 2, 3, 4, 5, 6])
+                ),
+            },
+            {"name": "Y", "types": [], "stats": None},
+        ],
         "http://api/api/teams": [
             {"id": 1, "name": "Ma team", "format": "F1", "pokemon": ["X", "Y"]}
         ],
@@ -360,6 +402,9 @@ def test_builder_affiche_les_winrates(stats_api):
     )
     assert "83.3 %" in resp.text and "X + Y" in resp.text and "100.0 %" in resp.text
     assert "Z 100.0 % (5)" in resp.text  # matchup
+    assert '<span class="type">Eau</span>' in resp.text
+    assert '<td class="num">21</td>' in resp.text  # total des statistiques de X
+    assert "pas encore chargées depuis PokéAPI" in resp.text  # Y
     assert "Se connecter" in resp.text  # pas connecté : pas d'enregistrement
 
 

@@ -1,14 +1,21 @@
 """Scraper : récupère les tournois VGC récents sur play.limitlesstcg.com et les envoie au tournament-service.
 
 Source : API JSON publique, sans clé (https://docs.limitlesstcg.com/developer).
-Usage : python scraper.py              -> les SCRAPE_LIMIT derniers tournois VGC
-        python scraper.py <tournoi_id> -> un ou plusieurs tournois précis
+Usage : python scraper.py              -> les SCRAPE_LIMIT derniers tournois VGC, puis enrich
+        python scraper.py <tournoi_id> -> un ou plusieurs tournois précis, puis enrich
+        python scraper.py enrich       -> seulement l'enrichissement PokéAPI
+
+Enrichissement : types et statistiques des Pokémon, type, catégorie et puissance des attaques,
+depuis PokéAPI (https://pokeapi.co), pour les noms que le tournament-service n'a pas encore.
+La base sert de cache : un nom enrichi n'est plus jamais redemandé.
 """
 
 import datetime
 import os
+import re
 import sys
 import time
+import unicodedata
 
 import requests
 
@@ -17,11 +24,34 @@ HEADERS = {"User-Agent": "M1-projet-pokemon/0.1 (projet etudiant)"}
 DELAY = 1  # secondes entre deux requêtes vers Limitless
 
 
-def get(path, **params):
-    time.sleep(DELAY)  # avant la requête : la pause a lieu même après une erreur
-    resp = requests.get(f"{API}{path}", params=params, headers=HEADERS, timeout=20)
+def get_json(url, delay, params=None, missing_ok=False):
+    """GET JSON poli : pause avant la requête (même après une erreur), User-Agent explicite.
+
+    missing_ok : None pour un 404 au lieu d'une erreur.
+    """
+    time.sleep(delay)
+    resp = requests.get(url, params=params, headers=HEADERS, timeout=20)
+    if missing_ok and resp.status_code == 404:
+        return None
     resp.raise_for_status()
     return resp.json()
+
+
+def get(path, **params):
+    return get_json(f"{API}{path}", DELAY, params)
+
+
+POKEAPI = "https://pokeapi.co/api/v2"
+POKEAPI_DELAY = 0.1  # API gratuite : on reste poli
+# Limitless écrit « Hisuian Arcanine », PokéAPI « arcanine-hisui ».
+REGIONS = {
+    "alolan": "alola",
+    "galarian": "galar",
+    "hisuian": "hisui",
+    "paldean": "paldea",
+}
+BATCH = 50  # noms par envoi au tournament-service
+STATS = ("hp", "attack", "defense", "special-attack", "special-defense", "speed")
 
 
 def clean(value):
@@ -124,6 +154,108 @@ def scrape(tournament_id, api_url):
     print(f"{payload['name']} ({tournament_id}) : {status}", flush=True)
 
 
+def slug(name):
+    """Nom affiché -> identifiant PokéAPI : « King's Shield » -> kings-shield, « Flabébé » -> flabebe.
+
+    Vide pour un nom sans lettre latine, ou fait seulement de chiffres (PokéAPI y lirait un numéro).
+    """
+    name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    name = re.sub(r"[^a-z0-9 -]", "", name.lower())
+    name = re.sub(r"[ -]+", "-", name).strip("-")
+    return "" if name.isdigit() else name
+
+
+def pokemon_slugs(name):
+    """Identifiants PokéAPI à essayer, dans l'ordre, pour un nom de Limitless.
+
+    « Indeedee ♀ » -> indeedee-female ; « Heat Rotom » -> rotom-heat ;
+    « Eternal Flower Floette » -> floette-eternal-flower, puis floette-eternal.
+    """
+    name = name.replace("♀", " Female").replace("♂", " Male")
+    *form, species = name.split()
+    slugs = [slug(name)]
+    if form:
+        form = [REGIONS.get(w.lower(), w) for w in form]
+        slugs += [slug(f"{species} {' '.join(form)}"), slug(f"{species} {form[0]}")]
+    return [s for s in dict.fromkeys(slugs) if s]
+
+
+def pokeapi(path):
+    """GET JSON sur PokéAPI, None si le nom n'existe pas (404)."""
+    return get_json(f"{POKEAPI}/{path}", POKEAPI_DELAY, missing_ok=True)
+
+
+def parse_pokemon(name, data):
+    stats = {s["stat"]["name"]: s["base_stat"] for s in data["stats"]}
+    return {
+        "name": name,
+        "types": [
+            t["type"]["name"] for t in sorted(data["types"], key=lambda t: t["slot"])
+        ],
+        "stats": [stats[k] for k in STATS],
+    }
+
+
+def fetch_pokemon(name):
+    for s in pokemon_slugs(name):
+        if data := pokeapi(f"pokemon/{s}"):
+            return parse_pokemon(name, data)
+    # Forme précisée mais inconnue : mieux vaut rien que les données d'une autre forme.
+    if not re.fullmatch(r"[\w-]+", name) or not slug(name):
+        return None
+    # Un seul mot, espèce à plusieurs formes (Aegislash, Maushold…) : sa forme par défaut.
+    species = pokeapi(f"pokemon-species/{slug(name)}")
+    if not species:
+        return None
+    default = next(
+        v["pokemon"]["name"] for v in species["varieties"] if v["is_default"]
+    )
+    data = pokeapi(f"pokemon/{default}")
+    return parse_pokemon(name, data) if data else None
+
+
+def fetch_move(name):
+    data = slug(name) and pokeapi(f"move/{slug(name)}")
+    if not data:
+        return None
+    return {
+        "name": name,
+        "type": data["type"]["name"],
+        "category": data["damage_class"]["name"],
+        "power": data["power"],  # None pour une attaque de statut
+    }
+
+
+def enrich(api_url):
+    """Envoie au tournament-service ce que PokéAPI sait des noms qui lui manquent.
+
+    Par lots : si PokéAPI tombe en route, les lots déjà envoyés restent enregistrés.
+    """
+    missing = get_json(f"{api_url}/internal/enrich/missing", 0)
+    jobs = [("pokemon", n, fetch_pokemon) for n in missing["pokemon"]]
+    jobs += [("moves", n, fetch_move) for n in missing["moves"]]
+    # ponytail: un nom inconnu de PokéAPI est redemandé à chaque passage (2 à 4 requêtes).
+    # Le marquer « introuvable » en base si ces noms deviennent nombreux.
+    unknown, stored = [], {"pokemon": 0, "moves": 0}
+    for start in range(0, len(jobs), BATCH):
+        found = {"pokemon": [], "moves": []}
+        for kind, name, fetch in jobs[start : start + BATCH]:
+            if info := fetch(name):
+                found[kind].append(info)
+            else:
+                unknown.append(name)
+        resp = requests.post(f"{api_url}/internal/enrich", json=found, timeout=60)
+        resp.raise_for_status()
+        for kind, n in resp.json().items():
+            stored[kind] += n
+    if unknown:
+        print(f"inconnus de PokéAPI : {', '.join(unknown)}", flush=True)
+    print(
+        f"PokéAPI : {stored['pokemon']} Pokémon et {stored['moves']} attaques enrichis",
+        flush=True,
+    )
+
+
 def is_over(tournament, now=None):
     """L'API ne dit pas si un tournoi est fini : on n'importe que ceux commencés il y a plus d'un jour.
 
@@ -136,7 +268,9 @@ def is_over(tournament, now=None):
 
 def main():
     api_url = os.environ["TOURNAMENT_API_URL"]
-    if len(sys.argv) > 1:
+    if sys.argv[1:] == ["enrich"]:
+        ids = []
+    elif len(sys.argv) > 1:
         ids = sys.argv[1:]
     else:
         # ponytail: les tournois déjà en base sont re-téléchargés puis ignorés par l'import (idempotent).
@@ -152,6 +286,11 @@ def main():
         except Exception as e:  # noqa: BLE001 (un tournoi en erreur ne bloque pas les suivants)
             failed += 1
             print(f"échec pour {tid} : {e!r}", file=sys.stderr, flush=True)
+    try:
+        enrich(api_url)
+    except Exception as e:  # noqa: BLE001 (les tournois importés restent importés)
+        failed += 1
+        print(f"échec de l'enrichissement PokéAPI : {e!r}", file=sys.stderr, flush=True)
     sys.exit(1 if failed else 0)
 
 

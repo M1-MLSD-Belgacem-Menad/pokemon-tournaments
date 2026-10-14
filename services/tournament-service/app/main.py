@@ -8,7 +8,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from app import stats
 from app.auth import current_user_id
 from app.db import Conn, connect, migrate
-from app.schemas import LocalTournament, TournamentImport
+from app.schemas import STATS, Enrichment, LocalTournament, TournamentImport
 
 
 @asynccontextmanager
@@ -52,6 +52,17 @@ def name_ids(cur, table: str, names: set[str]) -> dict[str, int]:
             names
         )  # toujours le même ordre de verrous : pas d'interblocage entre deux imports
     }
+
+
+def existing_ids(cur, table: str, names: set[str]) -> dict[str, int]:
+    """Id des noms déjà présents dans une table de référence ; les autres sont absents du résultat."""
+    if not names:
+        return {}
+    cur.execute(
+        f"SELECT id, name FROM {table} WHERE name IN ({', '.join(['%s'] * len(names))})",
+        sorted(names),
+    )
+    return {r["name"]: r["id"] for r in cur.fetchall()}
 
 
 @app.post("/internal/import", status_code=201)
@@ -174,6 +185,57 @@ def import_tournament(
     return {"id": tournament_id}
 
 
+@app.get("/internal/enrich/missing")
+def enrich_missing(conn: Conn) -> dict[str, list[str]]:
+    """Pokémon sans statistiques et attaques sans catégorie : ce que `scraper.py enrich` doit chercher."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT pk.name FROM pokemon pk LEFT JOIN pokemon_stats ps ON ps.pokemon_id = pk.id"
+            " WHERE ps.pokemon_id IS NULL ORDER BY pk.name"
+        )
+        pokemon = [r["name"] for r in cur.fetchall()]
+        cur.execute("SELECT name FROM move WHERE category IS NULL ORDER BY name")
+        moves = [r["name"] for r in cur.fetchall()]
+    return {"pokemon": pokemon, "moves": moves}
+
+
+@app.post("/internal/enrich")
+def enrich(data: Enrichment, conn: Conn) -> dict[str, int]:
+    """Enregistre types, statistiques et détails d'attaque des noms déjà en base (les autres sont ignorés).
+
+    Rejouable : remplace ce qui existe. Renvoie le nombre de Pokémon et d'attaques enregistrés.
+    """
+    with conn.cursor() as cur:
+        pokemon = existing_ids(cur, "pokemon", {p.name for p in data.pokemon})
+        moves = existing_ids(cur, "move", {m.name for m in data.moves})
+        known_pokemon = [p for p in data.pokemon if p.name in pokemon]
+        known_moves = [m for m in data.moves if m.name in moves]
+        types = name_ids(
+            cur,
+            "type",
+            {t for p in known_pokemon for t in p.types} | {m.type for m in known_moves},
+        )
+        for p in known_pokemon:
+            pid = pokemon[p.name]
+            cur.execute(
+                f"INSERT INTO pokemon_stats (pokemon_id, {', '.join(STATS)})"
+                " VALUES (%s, %s, %s, %s, %s, %s, %s) AS new"
+                f" ON DUPLICATE KEY UPDATE {', '.join(f'{s} = new.{s}' for s in STATS)}",
+                (pid, *p.stats),
+            )
+            cur.execute("DELETE FROM pokemon_type WHERE pokemon_id = %s", (pid,))
+            cur.executemany(
+                "INSERT INTO pokemon_type (pokemon_id, slot, type_id) VALUES (%s, %s, %s)",
+                [(pid, slot, types[t]) for slot, t in enumerate(p.types, start=1)],
+            )
+        cur.executemany(
+            "UPDATE move SET type_id = %s, category = %s, power = %s WHERE id = %s",
+            [(types[m.type], m.category, m.power, moves[m.name]) for m in known_moves],
+        )
+    conn.commit()
+    return {"pokemon": len(known_pokemon), "moves": len(known_moves)}
+
+
 @app.post("/api/tournaments", status_code=201)
 def create_local_tournament(
     data: LocalTournament,
@@ -282,8 +344,9 @@ def get_tournament(
         )
         standings = cur.fetchall()
         cur.execute(
-            "SELECT tp.id, tp.standing_id, pk.name, it.name AS item, ab.name AS ability"
-            " FROM team_pokemon tp JOIN standing s ON s.id = tp.standing_id"
+            "SELECT tp.id, tp.standing_id, pk.name, it.name AS item, ab.name AS ability, "
+            + stats.TYPES
+            + " FROM team_pokemon tp JOIN standing s ON s.id = tp.standing_id"
             " JOIN pokemon pk ON pk.id = tp.pokemon_id"
             " LEFT JOIN item it ON it.id = tp.item_id LEFT JOIN ability ab ON ab.id = tp.ability_id"
             " WHERE s.tournament_id = %s" + in_top + " ORDER BY tp.slot",
@@ -291,17 +354,19 @@ def get_tournament(
         )
         team_rows = cur.fetchall()
         cur.execute(
-            "SELECT tpm.team_pokemon_id, mv.name FROM team_pokemon_move tpm"
-            " JOIN team_pokemon tp ON tp.id = tpm.team_pokemon_id"
+            "SELECT tpm.team_pokemon_id, mv.name, ty.name AS type, mv.category, mv.power"
+            " FROM team_pokemon_move tpm JOIN team_pokemon tp ON tp.id = tpm.team_pokemon_id"
             " JOIN standing s ON s.id = tp.standing_id JOIN move mv ON mv.id = tpm.move_id"
+            " LEFT JOIN type ty ON ty.id = mv.type_id"
             " WHERE s.tournament_id = %s" + in_top + " ORDER BY tpm.slot",
             (tournament_id, *top_args),
         )
-        moves: dict[int, list[str]] = {}
+        moves: dict[int, list[dict]] = {}
         for row in cur.fetchall():
-            moves.setdefault(row["team_pokemon_id"], []).append(row["name"])
+            moves.setdefault(row.pop("team_pokemon_id"), []).append(row)
         teams: dict[int, list[dict]] = {}
         for row in team_rows:
+            row["types"] = stats.split_types(row["types"])
             row["moves"] = moves.get(row.pop("id"), [])
             teams.setdefault(row.pop("standing_id"), []).append(row)
         cur.execute(
