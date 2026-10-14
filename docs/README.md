@@ -2,7 +2,7 @@
 
 Application web autour des résultats de tournois Pokémon : recensement des tournois par scraping, espace utilisateur pour saisir des tournois locaux, et créateur d'équipes avec statistiques de winrate. Projet de M1 (cours de programmation distribuée), réalisé en deux mois.
 
-> **Statut** : étape 4 du [plan par étapes](06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL), `scraper` (Limitless), `frontend` (liste et détail des tournois), Docker Compose, CI. Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
+> **Statut** : étape 5 du [plan par étapes](06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL), `scraper` (Limitless), `frontend` (liste et détail des tournois), Docker Compose, CI, publication Docker Hub et manifestes Kubernetes. Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
 
 ## Documentation
 
@@ -84,18 +84,32 @@ docker compose down -v     # repart d'une base vide
 
 ## Déploiement sur Kubernetes (minikube)
 
+Les images sont tirées de Docker Hub (`menadacheraiou/pokemon-<service>`) : il faut d'abord [publier la version](#publier-une-version) indiquée dans `k8s/kustomization.yaml`, qui fixe le compte et la version des images pour le cluster.
+
 ```bash
 minikube start
-minikube addons enable ingress
 
 kubectl apply -f k8s/namespace.yaml
-kubectl -n pokemon create secret generic mysql-credentials --from-env-file=.env
-kubectl apply -R -f k8s/
+# Mots de passe repris du .env de Compose : ils ne sont jamais dans le dépôt.
+kubectl -n pokemon create secret generic mysql --from-env-file=.env
+kubectl apply -k k8s/
 
-kubectl -n pokemon get pods,svc,ingress
+kubectl -n pokemon get pods,svc,pvc
+kubectl -n pokemon port-forward svc/frontend 8080:8000
 ```
 
-Puis ouvrir l'adresse donnée par `minikube ip` (ou utiliser `minikube tunnel` sous Windows/macOS).
+Puis ouvrir http://localhost:8080. Au premier lancement, les pods `tournament-service` restent en `Init` le temps que MySQL s'initialise. Les données survivent à `kubectl -n pokemon delete pod -l app=mysql` (volume persistant).
+
+Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t menadacheraiou/pokemon-tournament:0.1.0 services/tournament-service` (idem pour le frontend), avant `kubectl apply -k k8s/`.
+
+## Publier une version
+
+Au push d'un tag `v*`, si le lint et les tests passent, la CI construit les images et les publie sur Docker Hub avec la version du tag (`v0.1.0` donne `pokemon-tournament:0.1.0`). Il faut une fois les secrets GitHub `DOCKERHUB_USERNAME` (le compte Docker Hub en minuscules, le même que dans `k8s/kustomization.yaml`) et `DOCKERHUB_TOKEN` (*Settings > Secrets and variables > Actions*).
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
 
 ## Usage
 

@@ -1,0 +1,19 @@
+# Déploiement : kubectl apply -k k8s/  (voir le README pour le Secret à créer avant)
+namespace: pokemon
+resources:
+  - namespace.yaml
+  - mysql/pvc.yaml
+  - mysql/deployment.yaml
+  - mysql/service.yaml
+  - tournament/deployment.yaml
+  - tournament/service.yaml
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+# Seul endroit où changer le compte Docker Hub et la version des images.
+images:
+  - name: pokemon-tournament
+    newName: menadacheraiou/pokemon-tournament
+    newTag: "0.1.0"
+  - name: pokemon-frontend
+    newName: menadacheraiou/pokemon-frontend
+    newTag: "0.1.0"
