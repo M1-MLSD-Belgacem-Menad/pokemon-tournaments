@@ -9,6 +9,8 @@ resources:
   - tournament/service.yaml
   - frontend/deployment.yaml
   - frontend/service.yaml
+  - ingress.yaml
+  - scraper/cronjob.yaml
 # Seul endroit où changer le compte Docker Hub et la version des images.
 images:
   - name: pokemon-tournament
@@ -16,4 +18,7 @@ images:
     newTag: "0.1.0"
   - name: pokemon-frontend
     newName: menadacheraiou/pokemon-frontend
+    newTag: "0.1.0"
+  - name: pokemon-scraper
+    newName: menadacheraiou/pokemon-scraper
     newTag: "0.1.0"
