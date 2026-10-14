@@ -18,8 +18,11 @@
       {% for p in s.team %}
         <div class="mon">
           <strong>{{ p.name }}</strong>{% if p.item %} <span class="item">@ {{ p.item }}</span>{% endif %}
+          {% if p.types %}<div>{% for ty in p.types %}<span class="type">{{ ty | type_fr }}</span>{% endfor %}</div>{% endif %}
           {% if p.ability %}<div class="ability">{{ p.ability }}</div>{% endif %}
-          {% if p.moves %}<ul class="moves">{% for m in p.moves %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+          {% if p.moves %}<ul class="moves">{% for m in p.moves %}
+            <li>{{ m.name }}{% if m.type %} <span class="meta">({{ m.type | type_fr }}, {{ m.category | category_fr }}{% if m.power %}, {{ m.power }}{% endif %})</span>{% endif %}</li>
+          {% endfor %}</ul>{% endif %}
         </div>
       {% else %}
         <span class="meta">équipe non publiée par l'organisateur</span>

@@ -133,7 +133,7 @@ docs/04 + README         uv au lieu de requirements.txt, requests seul pour le s
 
 Une migration et une PR chacune, dans l'ordre de F-02, en s'arrêtant quand le temps l'impose :
 
-1. Types (003) : commande `enrich` du scraper qui interroge PokéAPI, avec cache local.
+1. Types (003) : commande `enrich` du scraper qui interroge PokéAPI ; la base sert de cache (un nom enrichi n'est plus redemandé).
 2. Attaques (004), talents (005), objets (006) : déjà dans le JSON du scraper, il suffit de les enregistrer.
 3. Statistiques (007) depuis PokéAPI.
 

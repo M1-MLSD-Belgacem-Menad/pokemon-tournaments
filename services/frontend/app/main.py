@@ -17,6 +17,17 @@ API_URL = os.environ["TOURNAMENT_API_URL"]
 USER_API_URL = os.environ["USER_API_URL"]
 HERE = Path(__file__).parent
 templates = Jinja2Templates(HERE / "templates")
+# Noms anglais de PokéAPI -> affichage en français.
+TYPES_FR = {
+    "normal": "Normal", "fire": "Feu", "water": "Eau", "electric": "Électrik",
+    "grass": "Plante", "ice": "Glace", "fighting": "Combat", "poison": "Poison",
+    "ground": "Sol", "flying": "Vol", "psychic": "Psy", "bug": "Insecte",
+    "rock": "Roche", "ghost": "Spectre", "dragon": "Dragon", "dark": "Ténèbres",
+    "steel": "Acier", "fairy": "Fée", "stellar": "Stellaire",
+}  # fmt: skip
+CATEGORIES_FR = {"physical": "physique", "special": "spéciale", "status": "statut"}
+templates.env.filters["type_fr"] = lambda t: TYPES_FR.get(t, t)
+templates.env.filters["category_fr"] = lambda c: CATEGORIES_FR.get(c, c)
 app = FastAPI(title="frontend")
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
@@ -223,6 +234,12 @@ def builder_page(request: Request, fmt: str | None, chosen: list[str], **extra):
         ctx["chosen"] = chosen
         q = urlencode({"format": fmt, "pokemon": chosen}, doseq=True)
         if chosen:
+            ctx["info"] = {
+                p["name"]: p
+                for p in api_get(
+                    f"/api/pokemon?{urlencode({'pokemon': chosen}, doseq=True)}"
+                )
+            }
             ctx["stats"] = api_get(f"/api/stats/pokemon?{q}")
             ctx["pairs"] = api_get(f"/api/stats/combinations?{q}")
             ctx["matchups"] = {
