@@ -52,9 +52,9 @@ Les labs Google (L-03, L-04) sont individuels et indépendants du code : **[Reco
 
 ### Étape 1 : recensement des tournois
 
-- [ ] Choisir la source (voir questions) et vérifier ses conditions d'utilisation.
-- [ ] Enregistrer 3 pages représentatives dans `services/scraper/tests/fixtures/`.
-- [ ] `parse_tournament(html) -> dict` testé sur ces fichiers.
+- [x] Choisir la source : API JSON de play.limitlesstcg.com.
+- [x] Enregistrer des réponses réelles de l'API dans `services/scraper/tests/fixtures/`.
+- [x] `parse_standings()` et `parse_pairings()` testés sur ces fichiers.
 - [ ] Migration 001 ; `POST /internal/import` transactionnel et idempotent (même `source_url` = pas de doublon).
 - [ ] `GET /api/tournaments`, `GET /api/tournaments/{id}`.
 - [ ] Pages frontend : liste des tournois, détail avec top 16 et équipes.

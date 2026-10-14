@@ -27,6 +27,22 @@ services:
         condition: service_healthy
     ports:
       - "8001:8000"
+    healthcheck:
+      test: ["CMD", ".venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Tâche ponctuelle : `docker compose run --rm scraper` (le profil évite qu'elle tourne à chaque `up`).
+  scraper:
+    build: services/scraper
+    profiles: [scraper]
+    environment:
+      TOURNAMENT_API_URL: http://tournament-service:8000
+      SCRAPE_LIMIT: ${SCRAPE_LIMIT:-5}
+    depends_on:
+      tournament-service:
+        condition: service_healthy
 
 volumes:
   mysql-data:
