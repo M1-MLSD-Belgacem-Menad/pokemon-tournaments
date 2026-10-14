@@ -1,6 +1,6 @@
 # Trafic entrant refusé par défaut ; chaque règle ouvre un seul chemin.
 # Le trafic sortant reste libre (le scraper appelle Limitless sur Internet, tous font du DNS).
-# Appliquées seulement si le réseau du cluster les gère : minikube start --cni=calico.
+# Appliquées seulement si le réseau du cluster les gère : minikube start --cni=calico, ou Dataplane V2 sur GKE (infra/gke).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

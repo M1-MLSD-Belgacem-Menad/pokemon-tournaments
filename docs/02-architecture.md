@@ -230,6 +230,8 @@ k8s/
 
 **[Reco]** GKE, cohérent avec les labs Google (LABS) ; création du cluster par Terraform (vu en cours). À ne lancer qu'après un déploiement minikube stable.
 
+Fait à l'étape 12 : `infra/gke/` (Terraform, fournisseur `hashicorp/google`) crée un cluster **zonal** `pokemon` de deux nœuds `e2-medium` en `europe-west1-b`, avec **Dataplane V2** pour appliquer les NetworkPolicy. Les manifestes `k8s/` sont les mêmes que sur minikube ; ingress-nginx est installé depuis son manifeste « cloud » (version figée), qui expose la gateway par un Service `LoadBalancer`. L'état Terraform reste local (projet d'un seul utilisateur, cluster détruit après les captures).
+
 ## 6. Structure du dépôt
 
 ```
