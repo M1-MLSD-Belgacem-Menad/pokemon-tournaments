@@ -33,6 +33,16 @@ services:
       timeout: 5s
       retries: 10
 
+  frontend:
+    build: services/frontend
+    environment:
+      TOURNAMENT_API_URL: http://tournament-service:8000
+    depends_on:
+      tournament-service:
+        condition: service_healthy
+    ports:
+      - "8080:8000"
+
   # Tâche ponctuelle : `docker compose run --rm scraper` (le profil évite qu'elle tourne à chaque `up`).
   scraper:
     build: services/scraper

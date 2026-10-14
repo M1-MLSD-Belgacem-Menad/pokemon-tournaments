@@ -13,8 +13,8 @@ def import_one(
 
 
 def test_list_most_recent_first_with_filters(client, db):
-    old = import_one(client, url="u1", date="2026-09-01", fmt="M-B")
-    new = import_one(client, url="u2", date="2026-10-13")
+    old = import_one(client, url="https://x/u1", date="2026-09-01", fmt="M-B")
+    new = import_one(client, url="https://x/u2", date="2026-10-13")
     assert [t["id"] for t in client.get("/api/tournaments").json()] == [new, old]
     assert [t["id"] for t in client.get("/api/tournaments?format=M-B").json()] == [old]
     assert [
