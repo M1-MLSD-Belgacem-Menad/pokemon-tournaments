@@ -2,7 +2,7 @@
 
 Application web autour des résultats de tournois Pokémon : recensement des tournois par scraping, espace utilisateur pour saisir des tournois locaux, et créateur d'équipes avec statistiques de winrate. Projet de M1 (cours de programmation distribuée), réalisé en deux mois.
 
-> **Statut** : étape 11 du [plan par étapes](06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL, avec objets, talents et attaques), `user-service` (inscription, connexion, JWT), `scraper` (Limitless), `frontend` (liste et détail des tournois, connexion, saisie d'un tournoi local, créateur d'équipe avec winrates), Docker Compose, CI, publication Docker Hub et manifestes Kubernetes (Ingress HTTPS, scraper quotidien, comptes de service sans droits, NetworkPolicy). Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
+> **Statut** : étape 12 du [plan par étapes](06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL, avec objets, talents, attaques, types et statistiques), `user-service` (inscription, connexion, JWT), `scraper` (Limitless, puis enrichissement par PokéAPI), `frontend` (liste et détail des tournois, connexion, saisie d'un tournoi local, créateur d'équipe avec winrates), Docker Compose, CI, publication Docker Hub et manifestes Kubernetes (Ingress HTTPS, scraper quotidien, comptes de service sans droits, NetworkPolicy). Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
 
 ## Documentation
 
@@ -70,7 +70,8 @@ docker compose up --build
 Lancer un scraping à la main :
 
 ```bash
-docker compose run --rm scraper
+docker compose run --rm scraper          # tournois récents, puis types et statistiques (PokéAPI)
+docker compose run --rm scraper enrich   # seulement l'enrichissement PokéAPI
 ```
 
 Si la base a été créée avant l'étape 7 (sans `user_db`), repartir d'une base vide une fois avec `docker compose down -v` : les bases et leurs comptes ne sont créés qu'au premier démarrage de MySQL. Cela permet aussi de ré-importer en entier les tournois importés quand seul le top 16 était enregistré (le scraper ignore un tournoi déjà en base).

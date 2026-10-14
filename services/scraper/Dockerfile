@@ -5,4 +5,5 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-cache
 COPY scraper.py ./
 USER nobody
-CMD [".venv/bin/python", "scraper.py"]
+# ENTRYPOINT : `docker compose run --rm scraper enrich` (ou <tournoi_id>) passe l'argument au script.
+ENTRYPOINT [".venv/bin/python", "scraper.py"]
