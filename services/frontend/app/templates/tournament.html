@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ t.name }}{% endblock %}
+{% block content %}
+<h1>{{ t.name }}</h1>
+<p class="meta">
+  {{ t.date }} · {{ t.format }}{% if t.player_count %} · {{ t.player_count }} joueurs{% endif %}
+  {% if t.source_url %} · <a href="{{ t.source_url }}">source</a>{% endif %}
+</p>
+<table>
+  <thead><tr><th>#</th><th>Joueur</th><th>Bilan</th><th>Équipe</th></tr></thead>
+  <tbody>
+  {% for s in t.standings %}
+    <tr>
+      <td>{{ s.placement }}</td>
+      <td>{{ s.player }}{% if s.country %} <span class="country">{{ s.country }}</span>{% endif %}</td>
+      <td>{% if s.wins is not none %}{{ s.wins }}-{{ s.losses }}{% if s.ties %}-{{ s.ties }}{% endif %}{% endif %}</td>
+      <td class="team">{% for p in s.team %}<span class="mon">{{ p }}</span>{% endfor %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
