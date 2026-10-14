@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dir: [services/tournament-service, services/scraper, services/frontend]
+        dir: [services/tournament-service, services/user-service, services/scraper, services/frontend]
     defaults:
       run:
         working-directory: ${{ matrix.dir }}
@@ -58,6 +58,7 @@ jobs:
       matrix:
         include:
           - { dir: services/tournament-service, image: pokemon-tournament }
+          - { dir: services/user-service, image: pokemon-user }
           - { dir: services/frontend, image: pokemon-frontend }
           - { dir: services/scraper, image: pokemon-scraper }
     steps:
