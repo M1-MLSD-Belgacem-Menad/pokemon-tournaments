@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Inscription{% endblock %}
+{% block content %}
+<h1>Inscription</h1>
+<form method="post" action="/register" class="stack">
+  <label>Nom d'utilisateur <input name="username" value="{{ form.username or '' }}" required minlength="3" maxlength="50" pattern="[A-Za-z0-9_\-]+" autocomplete="username"></label>
+  <label>E-mail <input name="email" type="email" value="{{ form.email or '' }}" required maxlength="255" autocomplete="email"></label>
+  <label>Mot de passe (8 caractères minimum) <input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
+  <button>Créer le compte</button>
+</form>
+{% endblock %}

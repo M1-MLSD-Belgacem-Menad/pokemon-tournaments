@@ -1,12 +1,20 @@
 import datetime
+import os
 from contextlib import asynccontextmanager
 from typing import Annotated
 
+import jwt
 import pymysql
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.db import connect, get_conn, migrate
-from app.schemas import TournamentImport
+from app.schemas import LocalTournament, TournamentImport
+
+# Clé partagée avec le user-service : les jetons se vérifient ici, sans appel réseau.
+JWT_SECRET = os.environ["JWT_SECRET"]  # absente : le service refuse de démarrer
+if len(JWT_SECRET) < 32:
+    raise RuntimeError("JWT_SECRET trop courte : 32 caractères minimum")
 
 
 @asynccontextmanager
@@ -21,6 +29,29 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="tournament-service", lifespan=lifespan)
 Conn = Annotated[pymysql.Connection, Depends(get_conn)]
+bearer = HTTPBearer(auto_error=False)
+
+
+def current_user_id(
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+) -> int:
+    """Id de l'utilisateur du jeton émis par le user-service, sinon 401."""
+    if creds is None:
+        raise HTTPException(
+            401, "jeton manquant", headers={"WWW-Authenticate": "Bearer"}
+        )
+    try:
+        claims = jwt.decode(
+            creds.credentials,
+            JWT_SECRET,
+            algorithms=["HS256"],
+            options={"require": ["sub", "exp"]},
+        )
+        return int(claims["sub"])
+    except (jwt.InvalidTokenError, ValueError) as e:
+        raise HTTPException(
+            401, "jeton invalide", headers={"WWW-Authenticate": "Bearer"}
+        ) from e
 
 
 @app.get("/health")
@@ -130,6 +161,60 @@ def import_tournament(
     return {"id": tournament_id}
 
 
+@app.post("/api/tournaments", status_code=201)
+def create_local_tournament(
+    data: LocalTournament,
+    user_id: Annotated[int, Depends(current_user_id)],
+    conn: Conn,
+) -> dict[str, int]:
+    """Saisie d'un tournoi local par un utilisateur connecté, en une transaction."""
+    with conn.cursor() as cur:
+        format_id = get_or_create(
+            cur,
+            "INSERT INTO format (code, name) VALUES (%s, %s)"
+            " ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)",
+            (data.format, data.format),
+        )
+        cur.execute(
+            "INSERT INTO tournament (name, date, format_id, source, player_count, created_by, detail_level)"
+            " VALUES (%s, %s, %s, 'local', %s, %s, %s)",
+            (
+                data.name,
+                data.date,
+                format_id,
+                data.player_count,
+                user_id,
+                data.detail_level,
+            ),
+        )
+        tournament_id = cur.lastrowid
+        pokemon_ids: dict[str, int] = {}
+        team_rows = []
+        for s in data.standings:
+            # ponytail: un joueur local est créé à chaque tournoi (pas d'identifiant commun entre deux saisies).
+            cur.execute("INSERT INTO player (name) VALUES (%s)", (s.player,))
+            cur.execute(
+                "INSERT INTO standing (tournament_id, player_id, placement) VALUES (%s, %s, %s)",
+                (tournament_id, cur.lastrowid, s.placement),
+            )
+            standing_id = cur.lastrowid
+            for slot, name in enumerate(s.team, start=1):
+                if name not in pokemon_ids:
+                    pokemon_ids[name] = get_or_create(
+                        cur,
+                        "INSERT INTO pokemon (name) VALUES (%s)"
+                        " ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)",
+                        (name,),
+                    )
+                team_rows.append((standing_id, slot, pokemon_ids[name]))
+        cur.executemany(
+            "INSERT INTO team_pokemon (standing_id, slot, pokemon_id) VALUES (%s, %s, %s)",
+            team_rows,
+        )
+    conn.commit()
+    return {"id": tournament_id}
+
+
 @app.get("/api/tournaments")
 def list_tournaments(
     conn: Conn,
@@ -172,8 +257,8 @@ def get_tournament(
     top_args = (top,) if top else ()
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT t.id, t.name, t.date, f.code AS format, t.source, t.source_url, t.player_count"
-            " FROM tournament t JOIN format f ON f.id = t.format_id WHERE t.id = %s",
+            "SELECT t.id, t.name, t.date, f.code AS format, t.source, t.source_url, t.player_count,"
+            " t.detail_level FROM tournament t JOIN format f ON f.id = t.format_id WHERE t.id = %s",
             (tournament_id,),
         )
         tournament = cur.fetchone()

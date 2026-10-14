@@ -18,6 +18,8 @@ spec:
           env:
             - name: TOURNAMENT_API_URL
               value: http://tournament-service:8000
+            - name: USER_API_URL
+              value: http://user-service:8000
           ports:
             - containerPort: 8000
           readinessProbe:

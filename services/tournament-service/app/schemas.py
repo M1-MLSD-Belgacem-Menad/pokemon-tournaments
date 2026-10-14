@@ -1,6 +1,11 @@
 import datetime
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StringConstraints, model_validator
+
+Name = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
+]
 
 
 class Player(BaseModel):
@@ -53,4 +58,38 @@ class TournamentImport(BaseModel):
             refs |= {m.player1, m.player2} - {None}
         if missing := refs - known:
             raise ValueError(f"joueurs absents de `players` : {sorted(missing)}")
+        return self
+
+
+class LocalStanding(BaseModel):
+    placement: int = Field(ge=1, le=16)
+    player: Name
+    team: list[Name] = Field(default=[], max_length=6)
+
+
+class LocalTournament(BaseModel):
+    """Tournoi saisi par un utilisateur : vainqueur seul, ou classement jusqu'au top 16."""
+
+    name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
+    ]
+    date: datetime.date
+    format: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)
+    ]
+    detail_level: Literal["winner", "top16"]
+    player_count: int | None = Field(default=None, ge=1, le=100_000)
+    standings: list[LocalStanding]
+
+    @model_validator(mode="after")
+    def coherent_ranking(self):
+        n = len(self.standings)
+        if self.detail_level == "winner" and n != 1:
+            raise ValueError("« vainqueur seul » : exactement 1 classement")
+        if self.detail_level == "top16" and not 2 <= n <= 16:
+            raise ValueError("« top 16 » : de 2 à 16 classements")
+        if sorted(s.placement for s in self.standings) != list(range(1, n + 1)):
+            raise ValueError("les places doivent se suivre à partir de 1, sans doublon")
+        if self.player_count is not None and self.player_count < n:
+            raise ValueError("moins de participants que de joueurs classés")
         return self

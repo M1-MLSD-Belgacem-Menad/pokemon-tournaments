@@ -13,6 +13,7 @@ for key, default in {
     "NAME": "tournament_test",
 }.items():
     os.environ[f"DB_{key}"] = os.environ.get(f"TEST_DB_{key}", default)
+os.environ["JWT_SECRET"] = "cle-de-test-" + "x" * 32
 
 from app.db import connect
 from app.main import app
