@@ -29,8 +29,6 @@ def test_tous_les_joueurs_classes_puis_abandons():
         "name": "Staraptor",
         "item": "Staraptite",
         "ability": "Intimidate",
-        "nature": "Jolly",
-        "tera": None,
         "moves": ["Brave Bird", "Close Combat", "Tailwind", "Protect"],
     }
 

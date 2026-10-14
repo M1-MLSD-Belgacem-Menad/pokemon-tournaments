@@ -2,7 +2,11 @@
 name = "scraper"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["requests"]
+dependencies = [
+    "grpcio>=1.84.0",
+    "grpcio-tools>=1.84.0",
+    "requests",
+]
 
 [dependency-groups]
 dev = ["pytest"]
