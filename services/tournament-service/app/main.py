@@ -67,11 +67,11 @@ def import_tournament(
 
 @app.get("/internal/enrich/missing")
 def enrich_missing(conn: Conn) -> dict[str, list[str]]:
-    """Pokémon sans statistiques et attaques sans catégorie : ce que `scraper.py enrich` doit chercher."""
+    """Pokémon sans statistiques ou sans sprite, attaques sans catégorie : ce que `scraper.py enrich` doit chercher."""
     with conn.cursor() as cur:
         cur.execute(
             "SELECT pk.name FROM pokemon pk LEFT JOIN pokemon_stats ps ON ps.pokemon_id = pk.id"
-            " WHERE ps.pokemon_id IS NULL ORDER BY pk.name"
+            " WHERE ps.sprite_url IS NULL ORDER BY pk.name"  # aussi vrai sans ligne ps
         )
         pokemon = [r["name"] for r in cur.fetchall()]
         cur.execute("SELECT name FROM move WHERE category IS NULL ORDER BY name")
@@ -98,10 +98,10 @@ def enrich(data: Enrichment, conn: Conn) -> dict[str, int]:
         for p in known_pokemon:
             pid = pokemon[p.name]
             cur.execute(
-                f"INSERT INTO pokemon_stats (pokemon_id, {', '.join(STATS)})"
-                " VALUES (%s, %s, %s, %s, %s, %s, %s) AS new"
-                f" ON DUPLICATE KEY UPDATE {', '.join(f'{s} = new.{s}' for s in STATS)}",
-                (pid, *p.stats),
+                f"INSERT INTO pokemon_stats (pokemon_id, {', '.join(STATS)}, sprite_url)"
+                " VALUES (%s, %s, %s, %s, %s, %s, %s, %s) AS new"
+                f" ON DUPLICATE KEY UPDATE {', '.join(f'{s} = new.{s}' for s in (*STATS, 'sprite_url'))}",
+                (pid, *p.stats, p.sprite),
             )
             cur.execute("DELETE FROM pokemon_type WHERE pokemon_id = %s", (pid,))
             cur.executemany(
@@ -224,10 +224,12 @@ def get_tournament(
         )
         standings = cur.fetchall()
         cur.execute(
-            "SELECT tp.id, tp.standing_id, pk.name, it.name AS item, ab.name AS ability, "
+            "SELECT tp.id, tp.standing_id, pk.name, ps.sprite_url AS sprite,"
+            " it.name AS item, ab.name AS ability, "
             + stats.TYPES
             + " FROM team_pokemon tp JOIN standing s ON s.id = tp.standing_id"
             " JOIN pokemon pk ON pk.id = tp.pokemon_id"
+            " LEFT JOIN pokemon_stats ps ON ps.pokemon_id = pk.id"
             " LEFT JOIN item it ON it.id = tp.item_id LEFT JOIN ability ab ON ab.id = tp.ability_id"
             " WHERE s.tournament_id = %s" + in_top + " ORDER BY tp.slot",
             (tournament_id, *top_args),

@@ -57,6 +57,8 @@ REGIONS = {
 }
 BATCH = 50  # noms par envoi au tournament-service
 STATS = ("hp", "attack", "defense", "special-attack", "special-defense", "speed")
+# Même règle que le tournament-service, qui affiche le sprite tel quel dans une balise <img>.
+SPRITE_URL = r"https://raw\.githubusercontent\.com/PokeAPI/sprites/master/sprites/pokemon/[\w/-]+\.png"
 
 
 def clean(value):
@@ -189,6 +191,8 @@ def pokeapi(path):
 
 
 def parse_pokemon(name, data):
+    # None pour quelques formes ; une URL inattendue serait refusée par le tournament-service.
+    sprite = (data.get("sprites") or {}).get("front_default")
     stats = {s["stat"]["name"]: s["base_stat"] for s in data["stats"]}
     return {
         "name": name,
@@ -196,6 +200,7 @@ def parse_pokemon(name, data):
             t["type"]["name"] for t in sorted(data["types"], key=lambda t: t["slot"])
         ],
         "stats": [stats[k] for k in STATS],
+        "sprite": sprite if re.fullmatch(SPRITE_URL, sprite or "") else None,
     }
 
 

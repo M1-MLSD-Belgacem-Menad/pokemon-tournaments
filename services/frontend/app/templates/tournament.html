@@ -12,11 +12,13 @@
   {% for s in t.standings %}
     <tr>
       <td>{{ s.placement }}</td>
-      <td>{{ s.player }}{% if s.country %} <span class="country">{{ s.country }}</span>{% endif %}</td>
+      {% set flag = s.country | flag %}
+      <td>{{ s.player }}{% if s.country %} <span class="country">{% if flag %}<img class="flag" src="{{ flag }}" alt="" width="20" loading="lazy"> {% endif %}{{ s.country }}</span>{% endif %}</td>
       <td>{% if s.wins is not none %}{{ s.wins }}-{{ s.losses }}{% if s.ties %}-{{ s.ties }}{% endif %}{% endif %}</td>
       <td class="team">
       {% for p in s.team %}
         <div class="mon">
+          {% if p.sprite %}<img class="sprite" src="{{ p.sprite }}" alt="" width="48" height="48" loading="lazy">{% endif %}
           <strong>{{ p.name }}</strong>{% if p.item %} <span class="item">@ {{ p.item }}</span>{% endif %}
           {% if p.types %}<div>{% for ty in p.types %}<span class="type">{{ ty | type_fr }}</span>{% endfor %}</div>{% endif %}
           {% if p.ability %}<div class="ability">{{ p.ability }}</div>{% endif %}

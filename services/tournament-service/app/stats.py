@@ -81,13 +81,13 @@ def pokemon_info(
     conn: Conn,
     names: Names = [],  # noqa: B006
 ) -> list[dict]:
-    """Types et statistiques de base (PokéAPI) des Pokémon demandés ; `stats` vaut None s'ils manquent."""
+    """Types, sprite et statistiques de base (PokéAPI) des Pokémon demandés ; `stats` vaut None s'ils manquent."""
     if not names:
         return []
     where, args = in_names("pk.name", names)
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT pk.name, ps.hp, ps.atk, ps.def, ps.spa, ps.spd, ps.spe, "
+            "SELECT pk.name, ps.sprite_url, ps.hp, ps.atk, ps.def, ps.spa, ps.spd, ps.spe, "
             + TYPES
             + " FROM pokemon pk LEFT JOIN pokemon_stats ps ON ps.pokemon_id = pk.id"
             " WHERE TRUE" + where + " ORDER BY pk.name",
@@ -98,6 +98,7 @@ def pokemon_info(
         {
             "name": r["name"],
             "types": split_types(r["types"]),
+            "sprite": r["sprite_url"],
             "stats": {s: r[s] for s in STATS} if r["hp"] is not None else None,
         }
         for r in rows

@@ -41,7 +41,8 @@ def test_detail_has_top16_teams_and_matches(client, db):
         "name": "Rillaboom",
         "item": "Sitrus Berry",
         "ability": "Intimidate",
-        "types": [],  # pas encore enrichi par PokéAPI
+        "sprite": None,  # pas encore enrichi par PokéAPI
+        "types": [],
         "moves": [
             {"name": "Protect", "type": None, "category": None, "power": None},
             {"name": "Fake Out", "type": None, "category": None, "power": None},
