@@ -3,6 +3,10 @@ services:
     image: mysql:8.4
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?à définir dans .env}
+      # Crée tournament_db et un compte qui n'a de droits que sur elle.
+      MYSQL_DATABASE: tournament_db
+      MYSQL_USER: ${TOURNAMENT_DB_USER:?à définir dans .env}
+      MYSQL_PASSWORD: ${TOURNAMENT_DB_PASSWORD:?à définir dans .env}
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
@@ -13,6 +17,14 @@ services:
 
   tournament-service:
     build: services/tournament-service
+    environment:
+      DB_HOST: mysql
+      DB_USER: ${TOURNAMENT_DB_USER}
+      DB_PASSWORD: ${TOURNAMENT_DB_PASSWORD}
+      DB_NAME: tournament_db
+    depends_on:
+      mysql:
+        condition: service_healthy
     ports:
       - "8001:8000"
 
