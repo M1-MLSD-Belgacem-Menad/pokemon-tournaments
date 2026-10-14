@@ -54,7 +54,10 @@
      "name": "speed"
     }
    }
-  ]
+  ],
+  "sprites": {
+   "front_default": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/10009.png"
+  }
  },
  "pokemon/aegislash-shield": {
   "name": "aegislash-shield",
@@ -111,7 +114,10 @@
      "name": "speed"
     }
    }
-  ]
+  ],
+  "sprites": {
+   "front_default": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/681.png"
+  }
  },
  "pokemon-species/aegislash": {
   "name": "aegislash",
