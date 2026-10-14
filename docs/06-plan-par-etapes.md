@@ -69,7 +69,7 @@ docs/04 + README         uv au lieu de requirements.txt, requests seul pour le s
 
 **Résultat attendu** : le `tournament-service` reçoit un tournoi en JSON et l'enregistre proprement.
 
-- `db/migrations/tournament/001_init.sql` : le schéma v1 de `docs/02`, avec les ajouts de la décision 5.
+- `services/tournament-service/migrations/001_init.sql` : le schéma v1 de `docs/02`, avec les ajouts de la décision 5.
 - `app/db.py` : connexion PyMySQL depuis les variables d'environnement, et un petit `migrate()` (table `schema_version`, applique les fichiers non encore appliqués) lancé au démarrage.
 - Compte MySQL dédié : `tournament_user` n'a de droits que sur `tournament_db` (script d'init MySQL dans Compose).
 - `app/schemas.py` : modèles Pydantic du JSON d'import (tournoi, classements, équipes, matchs).

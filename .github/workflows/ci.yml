@@ -24,6 +24,18 @@ jobs:
     defaults:
       run:
         working-directory: ${{ matrix.dir }}
+    # Base MySQL jetable pour les tests (mêmes valeurs que les défauts de tests/conftest.py).
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: test
+          MYSQL_DATABASE: tournament_test
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -ptest"
+          --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
