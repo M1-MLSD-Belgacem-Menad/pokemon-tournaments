@@ -73,7 +73,7 @@ Lancer un scraping à la main :
 docker compose run --rm scraper
 ```
 
-Si la base a été créée avant l'étape 7 (sans `user_db`), repartir d'une base vide une fois avec `docker compose down -v` : les bases et leurs comptes ne sont créés qu'au premier démarrage de MySQL.
+Si la base a été créée avant l'étape 7 (sans `user_db`), repartir d'une base vide une fois avec `docker compose down -v` : les bases et leurs comptes ne sont créés qu'au premier démarrage de MySQL. Cela permet aussi de ré-importer en entier les tournois importés quand seul le top 16 était enregistré (le scraper ignore un tournoi déjà en base).
 
 Arrêter, et supprimer les données avec `-v` :
 

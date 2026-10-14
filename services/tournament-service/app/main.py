@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 import pymysql
-from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 
 from app.db import connect, get_conn, migrate
 from app.schemas import TournamentImport
@@ -71,6 +71,9 @@ def import_tournament(
                 )
                 for p in data.players
             }
+            # Peu d'espèces différentes même dans un gros tournoi : une requête par espèce, pas par slot.
+            pokemon_ids: dict[str, int] = {}
+            team_rows = []
             for s in data.standings:
                 cur.execute(
                     "INSERT INTO standing (tournament_id, player_id, placement, wins, losses, ties)"
@@ -86,16 +89,18 @@ def import_tournament(
                 )
                 standing_id = cur.lastrowid
                 for slot, pokemon in enumerate(s.team, start=1):
-                    pokemon_id = get_or_create(
-                        cur,
-                        "INSERT INTO pokemon (name) VALUES (%s)"
-                        " ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)",
-                        (pokemon.name,),
-                    )
-                    cur.execute(
-                        "INSERT INTO team_pokemon (standing_id, slot, pokemon_id) VALUES (%s, %s, %s)",
-                        (standing_id, slot, pokemon_id),
-                    )
+                    if pokemon.name not in pokemon_ids:
+                        pokemon_ids[pokemon.name] = get_or_create(
+                            cur,
+                            "INSERT INTO pokemon (name) VALUES (%s)"
+                            " ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)",
+                            (pokemon.name,),
+                        )
+                    team_rows.append((standing_id, slot, pokemon_ids[pokemon.name]))
+            cur.executemany(
+                "INSERT INTO team_pokemon (standing_id, slot, pokemon_id) VALUES (%s, %s, %s)",
+                team_rows,
+            )
             cur.executemany(
                 "INSERT INTO game_match (tournament_id, phase, round, player1_id, player2_id, winner_id)"
                 " VALUES (%s, %s, %s, %s, %s, %s)",
@@ -155,8 +160,16 @@ def list_tournaments(
 
 
 @app.get("/api/tournaments/{tournament_id}")
-def get_tournament(tournament_id: int, conn: Conn) -> dict:
-    """Un tournoi avec son classement, l'équipe de chaque joueur classé et les matchs enregistrés."""
+def get_tournament(
+    tournament_id: int, conn: Conn, top: Annotated[int | None, Query(ge=1)] = None
+) -> dict:
+    """Un tournoi avec son classement, l'équipe de chaque joueur et les matchs enregistrés.
+
+    `top=16` : seulement les 16 premiers et leurs matchs (sans `top` : tous les joueurs, abandons compris).
+    """
+    # Avec top, les abandons (placement NULL) sont exclus par la comparaison.
+    in_top = " AND s.placement <= %s" if top else ""
+    top_args = (top,) if top else ()
     with conn.cursor() as cur:
         cur.execute(
             "SELECT t.id, t.name, t.date, f.code AS format, t.source, t.source_url, t.player_count"
@@ -169,15 +182,17 @@ def get_tournament(tournament_id: int, conn: Conn) -> dict:
         cur.execute(
             "SELECT s.id, s.placement, p.name AS player, p.country, s.wins, s.losses, s.ties"
             " FROM standing s JOIN player p ON p.id = s.player_id"
-            " WHERE s.tournament_id = %s ORDER BY s.placement",
-            (tournament_id,),
+            " WHERE s.tournament_id = %s"
+            + in_top
+            + " ORDER BY s.placement IS NULL, s.placement, s.id",
+            (tournament_id, *top_args),
         )
         standings = cur.fetchall()
         cur.execute(
             "SELECT tp.standing_id, pk.name FROM team_pokemon tp"
             " JOIN standing s ON s.id = tp.standing_id JOIN pokemon pk ON pk.id = tp.pokemon_id"
-            " WHERE s.tournament_id = %s ORDER BY tp.slot",
-            (tournament_id,),
+            " WHERE s.tournament_id = %s" + in_top + " ORDER BY tp.slot",
+            (tournament_id, *top_args),
         )
         teams: dict[int, list[str]] = {}
         for row in cur.fetchall():
@@ -187,8 +202,15 @@ def get_tournament(tournament_id: int, conn: Conn) -> dict:
             " FROM game_match m JOIN player p1 ON p1.id = m.player1_id"
             " LEFT JOIN player p2 ON p2.id = m.player2_id"
             " LEFT JOIN player w ON w.id = m.winner_id"
-            " WHERE m.tournament_id = %s ORDER BY m.phase, m.round, m.id",
-            (tournament_id,),
+            " WHERE m.tournament_id = %s"
+            + (
+                " AND EXISTS (SELECT 1 FROM standing s WHERE s.tournament_id = m.tournament_id"
+                " AND s.player_id IN (m.player1_id, m.player2_id)" + in_top + ")"
+                if top
+                else ""
+            )
+            + " ORDER BY m.phase, m.round, m.id",
+            (tournament_id, *top_args),
         )
         matches = cur.fetchall()
     for s in standings:

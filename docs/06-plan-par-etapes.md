@@ -25,7 +25,7 @@ Ce sont des choix par défaut, les plus simples. Chacun se change facilement.
 4. **Matchs** : l'API Limitless a un endpoint `/tournaments/{id}/pairings` (champs `round`, `phase`, `player1`, `player2`, `winner` ; `winner = 0` nul, `-1` double défaite, `player2` vide = bye). Le prototype ne l'appelle pas encore : on l'ajoute à l'étape 3.
 5. **Identité des joueurs** : les matchs désignent les joueurs par leur identifiant Limitless (`player`), pas par leur nom affiché. Le schéma v1 ajoute donc `player.source_id` (unique, nul pour les tournois locaux), plus `standing.ties` et `game_match.phase`.
 6. **Pokémon légaux (étape 3)** : par défaut, les Pokémon vus dans les tournois scrapés du format courant (tous légaux par construction). C'est une limite à citer dans le rapport. Une liste officielle chargée depuis un fichier reste possible si le temps le permet.
-7. **Données riches dès le départ** : le scraper envoie déjà objet, talent, attaques et téra. Le `tournament-service` v1 n'enregistre que les noms et ignore le reste ; les migrations 003 à 005 l'enregistreront sans re-scraper.
+7. **Données riches dès le départ** : le scraper envoie déjà objet, talent, attaques et téra. Le `tournament-service` v1 n'enregistre que les noms et ignore le reste ; les migrations 004 à 006 l'enregistreront sans re-scraper.
 
 ---
 
@@ -123,7 +123,7 @@ docs/04 + README         uv au lieu de requirements.txt, requests seul pour le s
 
 ## Étape 8 : saisie d'un tournoi local (S5)
 
-- Migration 007 (`created_by`, `detail_level`).
+- Migration 008 (`created_by`, `detail_level`).
 - `POST /api/tournaments` : vérifie le JWT avec la clé partagée, accepte `winner` (1 classement) ou `top16` (2 à 16 classements contigus), 6 Pokémon max.
 - Frontend : connexion, inscription, formulaire de saisie (jeton dans un cookie `HttpOnly`).
 
@@ -133,16 +133,16 @@ docs/04 + README         uv au lieu de requirements.txt, requests seul pour le s
 
 Une migration et une PR chacune, dans l'ordre de F-02, en s'arrêtant quand le temps l'impose :
 
-1. Types (002) : commande `enrich` du scraper qui interroge PokéAPI, avec cache local.
-2. Attaques (003), talents (004), objets (005) : déjà dans le JSON du scraper, il suffit de les enregistrer.
-3. Statistiques (006) depuis PokéAPI.
+1. Types (003) : commande `enrich` du scraper qui interroge PokéAPI, avec cache local.
+2. Attaques (004), talents (005), objets (006) : déjà dans le JSON du scraper, il suffit de les enregistrer.
+3. Statistiques (007) depuis PokéAPI.
 
 **Critère de réussite** : la page détail affiche types, talents, objets et attaques ; les données importées avant chaque migration restent lisibles.
 
 ## Étape 10 : créateur d'équipes et statistiques (S6–S7, jusqu'au 1er déc.)
 
-- Migration 008 ; `GET /api/formats/{id}/legal-pokemon` (décision 6).
-- `GET /api/stats/pokemon`, `/combinations` (paires d'une même équipe), `/matchups` (matchs dont les deux équipes sont connues, donc entre joueurs du top 16).
+- Migration 009 ; `GET /api/formats/{id}/legal-pokemon` (décision 6).
+- `GET /api/stats/pokemon`, `/combinations` (paires d'une même équipe), `/matchups` (matchs dont les deux équipes sont connues : tous les joueurs sont enregistrés depuis la migration 002).
 - `POST /api/teams` (jeton requis, Pokémon légaux seulement, contrôle côté API).
 - Frontend : écran de construction (6 Pokémon max) qui affiche les winrates des Pokémon et des paires choisis.
 

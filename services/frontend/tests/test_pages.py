@@ -58,9 +58,9 @@ def fake_urlopen(responses):
 def api(monkeypatch):
     responses = {
         "http://api/api/tournaments": [TOURNAMENT],
-        "http://api/api/tournaments/1": TOURNAMENT,
-        "http://api/api/tournaments/999": 404,
-        "http://api/api/tournaments/500": 500,
+        "http://api/api/tournaments/1?top=16": TOURNAMENT,
+        "http://api/api/tournaments/999?top=16": 404,
+        "http://api/api/tournaments/500?top=16": 500,
     }
     monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
 

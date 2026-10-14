@@ -110,13 +110,13 @@ CREATE TABLE standing (
   id             INT AUTO_INCREMENT PRIMARY KEY,
   tournament_id  INT NOT NULL REFERENCES tournament(id) ON DELETE CASCADE,
   player_id      INT NOT NULL REFERENCES player(id),
-  placement      INT NOT NULL,
+  placement      INT,                          -- NULL : abandon (migration 002)
   wins           INT,
   losses         INT,
   UNIQUE (tournament_id, placement)
 );
 
--- Matchs qui ont mené les joueurs du top 16 à leur place (décision du 14/10)
+-- Tous les matchs du tournoi (décision du 14/10 : tous les joueurs sont enregistrés, le top 16 seul est affiché)
 CREATE TABLE game_match (
   id             INT AUTO_INCREMENT PRIMARY KEY,
   tournament_id  INT NOT NULL REFERENCES tournament(id) ON DELETE CASCADE,
@@ -139,13 +139,14 @@ CREATE TABLE team_pokemon (
 
 | Version | Étape | Changement |
 |---|---|---|
-| 002 | Types | `type(id, name)`, `pokemon_type(pokemon_id, type_id, slot)` (1 ou 2 types), chargés depuis PokéAPI |
-| 003 | Attaques | `move(id, name, type_id, category, power)`, `team_pokemon_move(team_pokemon_id, move_id, slot 1-4)` |
-| 004 | Talents | `ability(id, name)`, colonne `team_pokemon.ability_id` (nullable) |
-| 005 | Objets | `item(id, name)`, colonne `team_pokemon.item_id` (nullable) |
-| 006 | Statistiques | `pokemon_stats(pokemon_id, hp, atk, def, spa, spd, spe)`, depuis PokéAPI |
-| 007 | Étape 2 | `tournament.created_by` (id utilisateur, sans clé étrangère car il vit dans `user_db`), `tournament.detail_level ENUM('winner','top16')` |
-| 008 | Étape 3 | `format_legal_pokemon(format_id, pokemon_id)`, `saved_team(id, user_id, name, format_id)`, `saved_team_pokemon(saved_team_id, slot, pokemon_id)` |
+| 002 | Tous les joueurs | `standing.placement` devient facultatif : les abandons sont enregistrés sans place (décision du 14/10) |
+| 003 | Types | `type(id, name)`, `pokemon_type(pokemon_id, type_id, slot)` (1 ou 2 types), chargés depuis PokéAPI |
+| 004 | Attaques | `move(id, name, type_id, category, power)`, `team_pokemon_move(team_pokemon_id, move_id, slot 1-4)` |
+| 005 | Talents | `ability(id, name)`, colonne `team_pokemon.ability_id` (nullable) |
+| 006 | Objets | `item(id, name)`, colonne `team_pokemon.item_id` (nullable) |
+| 007 | Statistiques | `pokemon_stats(pokemon_id, hp, atk, def, spa, spd, spe)`, depuis PokéAPI |
+| 008 | Étape 2 | `tournament.created_by` (id utilisateur, sans clé étrangère car il vit dans `user_db`), `tournament.detail_level ENUM('winner','top16')` |
+| 009 | Étape 3 | `format_legal_pokemon(format_id, pokemon_id)`, `saved_team(id, user_id, name, format_id)`, `saved_team_pokemon(saved_team_id, slot, pokemon_id)` |
 
 Toutes les colonnes ajoutées après la v1 sont **nullables**, pour que les données déjà scrapées restent valides.
 
@@ -165,7 +166,7 @@ CREATE TABLE app_user (
 
 - **Winrate d'un Pokémon** : somme des victoires / somme des matchs des joueurs qui l'ont joué (`standing.wins`, `standing.losses`). Disponible dès la v1 si la source donne le bilan.
 - **Winrate d'une combinaison** : même calcul, groupé par paire de Pokémon de la même équipe (auto-jointure sur `team_pokemon`). Une combinaison = une **paire** de Pokémon (décision du 14/10, option la plus simple).
-- **Winrate par matchup** : à partir de `game_match`, on compare l'équipe du vainqueur et celle du perdant (Pokémon contre Pokémon). Seuls les matchs impliquant au moins un joueur du top 16 sont connus, ce qui est à signaler dans le rapport.
+- **Winrate par matchup** : à partir de `game_match`, on compare l'équipe du vainqueur et celle du perdant (Pokémon contre Pokémon). Tous les joueurs et tous les matchs du tournoi sont enregistrés, pour que les winrates ne viennent pas que des joueurs qui ont gagné. Seuls les matchs dont les deux joueurs ont publié leur équipe comptent.
 - **[Reco]** Calcul en SQL (requêtes ou vues) à la demande. Une table de cache ne se justifie que si c'est mesurablement lent.
 
 ## 4. Flux de données
@@ -174,7 +175,7 @@ CREATE TABLE app_user (
 
 1. Le CronJob lance `scraper` (par exemple une fois par jour).
 2. Le scraper liste les tournois VGC récents sur la source (les `SCRAPE_LIMIT` derniers). Ceux déjà importés sont ignorés par l'import lui-même, qui est idempotent sur `source_url`.
-3. Pour chaque nouveau tournoi, il extrait le top 16, les équipes et les matchs de ces joueurs, normalise les noms de Pokémon, puis envoie un JSON à `POST /internal/import`.
+3. Pour chaque nouveau tournoi, il extrait tous les joueurs (classés et abandons), leurs équipes et tous les matchs, normalise les noms de Pokémon, puis envoie un JSON à `POST /internal/import`.
 4. Le `tournament-service` valide le JSON (Pydantic), crée les Pokémon et joueurs inconnus, et écrit le tout **dans une seule transaction**.
 
 **Source et règles de scraping** (choix du 14/10) : l'API JSON publique de play.limitlesstcg.com (`/tournaments?game=VGC`, `/tournaments/{id}/details`, `/standings`, `/pairings`), plus stable que du HTML, donc `requests` seul. Source de secours si besoin : limitlessvgc.com (HTML, tournois officiels). Délai d'une seconde entre requêtes et `User-Agent` explicite ; jamais de requête réelle pendant les tests, qui utilisent des réponses enregistrées dans `tests/fixtures/`. Les parseurs `parse_standings()` et `parse_pairings()` sont des fonctions pures, testables hors réseau. Côté `/pairings` : `player2` absent = bye, `winner` = 0 nul, -1 double défaite (vérifié sur une vraie réponse).
