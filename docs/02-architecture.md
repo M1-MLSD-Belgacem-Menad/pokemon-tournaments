@@ -173,11 +173,11 @@ CREATE TABLE app_user (
 ### Scraping (étape 1)
 
 1. Le CronJob lance `scraper` (par exemple une fois par jour).
-2. Le scraper liste les tournois récents sur la source, ignore ceux déjà importés (`GET /api/tournaments?source_url=…`).
+2. Le scraper liste les tournois VGC récents sur la source (les `SCRAPE_LIMIT` derniers). Ceux déjà importés sont ignorés par l'import lui-même, qui est idempotent sur `source_url`.
 3. Pour chaque nouveau tournoi, il extrait le top 16, les équipes et les matchs de ces joueurs, normalise les noms de Pokémon, puis envoie un JSON à `POST /internal/import`.
 4. Le `tournament-service` valide le JSON (Pydantic), crée les Pokémon et joueurs inconnus, et écrit le tout **dans une seule transaction**.
 
-**[Reco] Règles de scraping** : `requests` + `BeautifulSoup` (ou l'API JSON du site si elle existe, plus stable que le HTML) ; respecter `robots.txt` et les conditions d'utilisation ; délai entre requêtes ; `User-Agent` explicite ; jamais de scraping pendant les tests (fichiers HTML enregistrés dans `tests/fixtures/`). Le parseur est isolé dans une fonction pure `parse_tournament(html) -> dict`, testable hors réseau.
+**Source et règles de scraping** (choix du 14/10) : l'API JSON publique de play.limitlesstcg.com (`/tournaments?game=VGC`, `/tournaments/{id}/details`, `/standings`, `/pairings`), plus stable que du HTML, donc `requests` seul. Source de secours si besoin : limitlessvgc.com (HTML, tournois officiels). Délai d'une seconde entre requêtes et `User-Agent` explicite ; jamais de requête réelle pendant les tests, qui utilisent des réponses enregistrées dans `tests/fixtures/`. Les parseurs `parse_standings()` et `parse_pairings()` sont des fonctions pures, testables hors réseau. Côté `/pairings` : `player2` absent = bye, `winner` = 0 nul, -1 double défaite (vérifié sur une vraie réponse).
 
 ### Enrichissement des Pokémon
 
@@ -234,7 +234,7 @@ pokemon-tournaments/
 ├── services/
 │   ├── tournament-service/    app/, migrations/, tests/, Dockerfile, pyproject.toml, uv.lock
 │   ├── user-service/          app/, migrations/, tests/, Dockerfile, pyproject.toml, uv.lock
-│   ├── scraper/               scraper/, tests/fixtures/, Dockerfile, pyproject.toml, uv.lock
+│   ├── scraper/               scraper.py, tests/fixtures/, Dockerfile, pyproject.toml, uv.lock
 │   └── frontend/              app/, templates/, static/, Dockerfile, pyproject.toml, uv.lock
 ├── k8s/
 ├── docker-compose.yml
