@@ -107,6 +107,7 @@ def test_players_and_pokemon_are_shared_between_tournaments(client, db):
         lambda p: p["matches"][0].update(winner="p5"),  # n'a pas joué ce match
         lambda p: p["standings"][0]["team"].append({"name": "Pikachu"}),  # 7 Pokémon
         lambda p: p.update(date="pas une date"),
+        lambda p: p.update(source_url="javascript:alert(1)"),
         lambda p: p["standings"][1].update(player="p1"),  # un joueur classé deux fois
     ],
 )

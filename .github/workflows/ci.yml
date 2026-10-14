@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dir: [services/tournament-service, services/scraper]
+        dir: [services/tournament-service, services/scraper, services/frontend]
     defaults:
       run:
         working-directory: ${{ matrix.dir }}
