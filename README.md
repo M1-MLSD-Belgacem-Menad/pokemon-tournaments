@@ -70,9 +70,11 @@ docker compose up --build
 Lancer un scraping à la main :
 
 ```bash
-docker compose run --rm scraper          # tournois récents, puis types et statistiques (PokéAPI)
-docker compose run --rm scraper enrich   # seulement l'enrichissement PokéAPI
+docker compose run --rm --build scraper          # tournois récents, puis types et statistiques (PokéAPI)
+docker compose run --rm --build scraper enrich   # seulement l'enrichissement PokéAPI
 ```
+
+`--build` reconstruit l'image du scraper si son code a changé : `docker compose up --build` ne le fait pas, le scraper n'étant lancé qu'à la demande.
 
 Si la base a été créée avant l'étape 7 (sans `user_db`), repartir d'une base vide une fois avec `docker compose down -v` : les bases et leurs comptes ne sont créés qu'au premier démarrage de MySQL. Cela permet aussi de ré-importer en entier les tournois importés quand seul le top 16 était enregistré (le scraper ignore un tournoi déjà en base).
 

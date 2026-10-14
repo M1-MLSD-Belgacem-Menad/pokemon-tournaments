@@ -85,7 +85,7 @@ docs/04 + README         uv au lieu de requirements.txt, requests seul pour le s
 - Ajouter `/pairings` et une fonction pure `parse_pairings(pairings, top_ids)` qui garde les matchs impliquant au moins un joueur du top 16.
 - `build_import_payload()` assemble le JSON de l'étape 2 ; `main` liste les tournois VGC récents, saute ceux déjà importés, envoie à `TOURNAMENT_API_URL/internal/import`.
 - Fixtures `standings.json` et `pairings.json` (réponses complètes d'un vrai tournoi) enregistrées depuis le PC de Menad (le proxy du cloud bloque Limitless).
-- Service `scraper` dans Compose (`docker compose run --rm scraper`).
+- Service `scraper` dans Compose (`docker compose run --rm --build scraper`).
 
 **Critère de réussite** : tests hors réseau verts (nul, double défaite, bye) ; sur le PC de Menad, `docker compose run --rm scraper` importe au moins un tournoi, et une requête SQL montre 16 classements et leurs équipes.
 
