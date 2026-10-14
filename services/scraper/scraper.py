@@ -24,6 +24,11 @@ def get(path, **params):
     return resp.json()
 
 
+def clean(value):
+    """Texte sans espaces autour, ou None s'il est vide."""
+    return value.strip() or None if isinstance(value, str) else None
+
+
 def parse_standings(standings):
     """JSON brut de /standings -> tous les joueurs, classés d'abord, puis les abandons (sans place).
 
@@ -40,11 +45,14 @@ def parse_standings(standings):
             "team": [
                 {
                     "name": p["name"],
-                    "item": p.get("item"),
-                    "ability": p.get("ability"),
-                    "nature": p.get("nature"),
-                    "tera": p.get("tera"),
-                    "moves": p.get("attacks", []),
+                    "item": clean(p.get("item")),
+                    "ability": clean(p.get("ability")),
+                    "nature": clean(p.get("nature")),
+                    "tera": clean(p.get("tera")),
+                    # Les champs vides ou null de Limitless ne font pas rejeter tout le tournoi.
+                    "moves": [
+                        m.strip() for m in p.get("attacks") or [] if m and m.strip()
+                    ],
                 }
                 for p in s.get("decklist") or []
             ],

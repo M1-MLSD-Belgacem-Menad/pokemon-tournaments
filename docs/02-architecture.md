@@ -141,10 +141,10 @@ CREATE TABLE team_pokemon (
 |---|---|---|
 | 002 | Tous les joueurs | `standing.placement` devient facultatif : les abandons sont enregistrés sans place (décision du 14/10) |
 | 003 | Types | `type(id, name)`, `pokemon_type(pokemon_id, type_id, slot)` (1 ou 2 types), chargés depuis PokéAPI |
-| 004 | Attaques | `move(id, name, type_id, category, power)`, `team_pokemon_move(team_pokemon_id, move_id, slot 1-4)` |
+| 004 | Attaques | `move(id, name)`, `team_pokemon_move(team_pokemon_id, move_id, slot 1-4)` ; `type_id`, `category`, `power` ajoutés en 007, après la création de `move` |
 | 005 | Talents | `ability(id, name)`, colonne `team_pokemon.ability_id` (nullable) |
 | 006 | Objets | `item(id, name)`, colonne `team_pokemon.item_id` (nullable) |
-| 007 | Statistiques | `pokemon_stats(pokemon_id, hp, atk, def, spa, spd, spe)`, depuis PokéAPI |
+| 007 | Statistiques | `pokemon_stats(pokemon_id, hp, atk, def, spa, spd, spe)`, et colonnes `move.type_id`, `category`, `power`, depuis PokéAPI |
 | 008 | Étape 2 | `tournament.created_by` (id utilisateur, sans clé étrangère car il vit dans `user_db`), `tournament.detail_level ENUM('winner','top16')` |
 | 009 | Étape 3 | `format_legal_pokemon(format_id, pokemon_id)`, `saved_team(id, user_id, name, format_id)`, `saved_team_pokemon(saved_team_id, slot, pokemon_id)` |
 

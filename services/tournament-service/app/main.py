@@ -66,6 +66,23 @@ def get_or_create(cur, sql: str, params: tuple) -> int:
     return cur.lastrowid
 
 
+def name_ids(cur, table: str, names: set[str]) -> dict[str, int]:
+    """Id de chaque nom d'une table de référence (pokemon, item, ability, move), créé s'il manque.
+
+    Une requête par nom distinct : peu d'espèces, d'objets ou d'attaques même dans un gros tournoi.
+    """
+    return {
+        name: get_or_create(
+            cur,
+            f"INSERT INTO {table} (name) VALUES (%s) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)",
+            (name,),
+        )
+        for name in sorted(
+            names
+        )  # toujours le même ordre de verrous : pas d'interblocage entre deux imports
+    }
+
+
 @app.post("/internal/import", status_code=201)
 def import_tournament(
     data: TournamentImport,
@@ -102,9 +119,7 @@ def import_tournament(
                 )
                 for p in data.players
             }
-            # Peu d'espèces différentes même dans un gros tournoi : une requête par espèce, pas par slot.
-            pokemon_ids: dict[str, int] = {}
-            team_rows = []
+            standing_ids = {}
             for s in data.standings:
                 cur.execute(
                     "INSERT INTO standing (tournament_id, player_id, placement, wins, losses, ties)"
@@ -118,19 +133,46 @@ def import_tournament(
                         s.ties,
                     ),
                 )
-                standing_id = cur.lastrowid
-                for slot, pokemon in enumerate(s.team, start=1):
-                    if pokemon.name not in pokemon_ids:
-                        pokemon_ids[pokemon.name] = get_or_create(
-                            cur,
-                            "INSERT INTO pokemon (name) VALUES (%s)"
-                            " ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)",
-                            (pokemon.name,),
-                        )
-                    team_rows.append((standing_id, slot, pokemon_ids[pokemon.name]))
+                standing_ids[s.player] = cur.lastrowid
+            team = [
+                (standing_ids[s.player], slot, p)
+                for s in data.standings
+                for slot, p in enumerate(s.team, start=1)
+            ]
+            pokemon = name_ids(cur, "pokemon", {p.name for _, _, p in team})
+            items = name_ids(cur, "item", {p.item for _, _, p in team if p.item})
+            abilities = name_ids(
+                cur, "ability", {p.ability for _, _, p in team if p.ability}
+            )
+            moves = name_ids(cur, "move", {m for _, _, p in team for m in p.moves})
             cur.executemany(
-                "INSERT INTO team_pokemon (standing_id, slot, pokemon_id) VALUES (%s, %s, %s)",
-                team_rows,
+                "INSERT INTO team_pokemon (standing_id, slot, pokemon_id, item_id, ability_id)"
+                " VALUES (%s, %s, %s, %s, %s)",
+                [
+                    (
+                        sid,
+                        slot,
+                        pokemon[p.name],
+                        items.get(p.item),
+                        abilities.get(p.ability),
+                    )
+                    for sid, slot, p in team
+                ],
+            )
+            # Les ids des lignes insérées en lot, pour y rattacher les attaques.
+            cur.execute(
+                "SELECT tp.id, tp.standing_id, tp.slot FROM team_pokemon tp"
+                " JOIN standing s ON s.id = tp.standing_id WHERE s.tournament_id = %s",
+                (tournament_id,),
+            )
+            tp_ids = {(r["standing_id"], r["slot"]): r["id"] for r in cur.fetchall()}
+            cur.executemany(
+                "INSERT INTO team_pokemon_move (team_pokemon_id, slot, move_id) VALUES (%s, %s, %s)",
+                [
+                    (tp_ids[(sid, slot)], move_slot, moves[m])
+                    for sid, slot, p in team
+                    for move_slot, m in enumerate(p.moves, start=1)
+                ],
             )
             cur.executemany(
                 "INSERT INTO game_match (tournament_id, phase, round, player1_id, player2_id, winner_id)"
@@ -188,7 +230,7 @@ def create_local_tournament(
             ),
         )
         tournament_id = cur.lastrowid
-        pokemon_ids: dict[str, int] = {}
+        pokemon = name_ids(cur, "pokemon", {n for s in data.standings for n in s.team})
         team_rows = []
         for s in data.standings:
             # ponytail: un joueur local est créé à chaque tournoi (pas d'identifiant commun entre deux saisies).
@@ -198,15 +240,10 @@ def create_local_tournament(
                 (tournament_id, cur.lastrowid, s.placement),
             )
             standing_id = cur.lastrowid
-            for slot, name in enumerate(s.team, start=1):
-                if name not in pokemon_ids:
-                    pokemon_ids[name] = get_or_create(
-                        cur,
-                        "INSERT INTO pokemon (name) VALUES (%s)"
-                        " ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)",
-                        (name,),
-                    )
-                team_rows.append((standing_id, slot, pokemon_ids[name]))
+            team_rows += [
+                (standing_id, slot, pokemon[name])
+                for slot, name in enumerate(s.team, start=1)
+            ]
         cur.executemany(
             "INSERT INTO team_pokemon (standing_id, slot, pokemon_id) VALUES (%s, %s, %s)",
             team_rows,
@@ -274,14 +311,28 @@ def get_tournament(
         )
         standings = cur.fetchall()
         cur.execute(
-            "SELECT tp.standing_id, pk.name FROM team_pokemon tp"
-            " JOIN standing s ON s.id = tp.standing_id JOIN pokemon pk ON pk.id = tp.pokemon_id"
+            "SELECT tp.id, tp.standing_id, pk.name, it.name AS item, ab.name AS ability"
+            " FROM team_pokemon tp JOIN standing s ON s.id = tp.standing_id"
+            " JOIN pokemon pk ON pk.id = tp.pokemon_id"
+            " LEFT JOIN item it ON it.id = tp.item_id LEFT JOIN ability ab ON ab.id = tp.ability_id"
             " WHERE s.tournament_id = %s" + in_top + " ORDER BY tp.slot",
             (tournament_id, *top_args),
         )
-        teams: dict[int, list[str]] = {}
+        team_rows = cur.fetchall()
+        cur.execute(
+            "SELECT tpm.team_pokemon_id, mv.name FROM team_pokemon_move tpm"
+            " JOIN team_pokemon tp ON tp.id = tpm.team_pokemon_id"
+            " JOIN standing s ON s.id = tp.standing_id JOIN move mv ON mv.id = tpm.move_id"
+            " WHERE s.tournament_id = %s" + in_top + " ORDER BY tpm.slot",
+            (tournament_id, *top_args),
+        )
+        moves: dict[int, list[str]] = {}
         for row in cur.fetchall():
-            teams.setdefault(row["standing_id"], []).append(row["name"])
+            moves.setdefault(row["team_pokemon_id"], []).append(row["name"])
+        teams: dict[int, list[dict]] = {}
+        for row in team_rows:
+            row["moves"] = moves.get(row.pop("id"), [])
+            teams.setdefault(row.pop("standing_id"), []).append(row)
         cur.execute(
             "SELECT m.phase, m.round, p1.name AS player1, p2.name AS player2, w.name AS winner"
             " FROM game_match m JOIN player p1 ON p1.id = m.player1_id"

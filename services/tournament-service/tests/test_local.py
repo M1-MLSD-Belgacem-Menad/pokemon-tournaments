@@ -43,7 +43,10 @@ def test_top16_saved_as_local(client, db):
         "Joueur 2",
         "Joueur 3",
     ]
-    assert body["standings"][0]["team"] == ["Incineroar", "Rillaboom"]
+    assert body["standings"][0]["team"] == [
+        {"name": n, "item": None, "ability": None, "moves": []}
+        for n in ("Incineroar", "Rillaboom")
+    ]
     with db.cursor() as cur:
         cur.execute("SELECT created_by FROM tournament")
         assert cur.fetchone()["created_by"] == 7

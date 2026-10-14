@@ -15,8 +15,11 @@ class Player(BaseModel):
 
 
 class TeamPokemon(BaseModel):
-    # Les autres champs envoyés par le scraper (objet, talent, attaques…) sont ignorés en v1.
-    name: str
+    # Nature et téracristal, aussi envoyés par le scraper, ne sont pas enregistrés.
+    name: Name
+    item: Name | None = None
+    ability: Name | None = None
+    moves: list[Name] = Field(default=[], max_length=4)
 
 
 class Standing(BaseModel):

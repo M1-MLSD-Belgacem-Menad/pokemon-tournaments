@@ -103,3 +103,14 @@ def test_tournoi_trop_recent_ignore():
     now = datetime.datetime(2026, 10, 14, 18, tzinfo=datetime.UTC)
     assert is_over({"date": "2026-10-13T12:00:00.000Z"}, now)
     assert not is_over({"date": "2026-10-14T12:00:00.000Z"}, now)
+
+
+def test_champs_vides_ou_null_nettoyes():
+    deck = [{"name": "Pikachu", "item": " ", "ability": None, "attacks": None}]
+    team = parse_standings([{"player": "x", "placing": 1, "decklist": deck}])[0]["team"]
+    assert team[0]["item"] is None and team[0]["moves"] == []
+    deck = [
+        {"name": "Pikachu", "item": "Light Ball ", "attacks": ["", " Protect", None]}
+    ]
+    team = parse_standings([{"player": "x", "placing": 1, "decklist": deck}])[0]["team"]
+    assert team[0]["item"] == "Light Ball" and team[0]["moves"] == ["Protect"]

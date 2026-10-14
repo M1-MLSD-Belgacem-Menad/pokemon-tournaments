@@ -37,7 +37,13 @@ def test_detail_has_top16_teams_and_matches(client, db):
     assert [s["placement"] for s in body["standings"]] == list(range(1, 17))
     first = body["standings"][0]
     assert first["player"] == "Joueur 1"
-    assert first["team"] == [
+    assert first["team"][0] == {
+        "name": "Rillaboom",
+        "item": "Sitrus Berry",
+        "ability": "Intimidate",
+        "moves": ["Protect", "Fake Out"],
+    }
+    assert [p["name"] for p in first["team"]] == [
         "Rillaboom",
         "Incineroar",
         "Urshifu",
