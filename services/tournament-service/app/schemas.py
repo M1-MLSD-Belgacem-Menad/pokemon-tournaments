@@ -15,7 +15,7 @@ class Player(BaseModel):
 
 
 class TeamPokemon(BaseModel):
-    # Nature et téracristal, aussi envoyés par le scraper, ne sont pas enregistrés.
+    # Nature et téracristal ne sont pas enregistrés : un champ en trop est ignoré.
     name: Name
     item: Name | None = None
     ability: Name | None = None

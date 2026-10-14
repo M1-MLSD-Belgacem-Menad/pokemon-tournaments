@@ -43,6 +43,12 @@ spec:
             matchLabels: { kubernetes.io/metadata.name: ingress-nginx }
       ports:
         - port: 8000
+    # gRPC : seul le scraper importe des tournois.
+    - from:
+        - podSelector:
+            matchLabels: { app: scraper }
+      ports:
+        - port: 50051
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

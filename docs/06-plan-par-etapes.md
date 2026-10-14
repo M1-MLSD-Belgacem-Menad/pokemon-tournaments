@@ -163,6 +163,8 @@ Au choix selon le temps, à trancher au début de S8 :
 
 **Critère de réussite** : capture de l'appli servie depuis GKE, ou import réussi par gRPC avec son test.
 
+Choix de Menad (14 oct.) : les deux, gRPC d'abord (fait : `TournamentImporter.Import`, tests des deux côtés), puis GKE par Terraform.
+
 ## Étape 13 : rendu (S9, puis marge jusqu'au 27 déc.)
 
 - Mini rapport dans `docs/rapport/` (captures prises à chaque palier depuis l'étape 5), captures et rapports des labs Google (colonne MLSD), PDF unique, envoi par mail.

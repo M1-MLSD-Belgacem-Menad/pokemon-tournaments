@@ -46,7 +46,7 @@
 - **Frontend en Jinja2** (décision du 14/10) : pages HTML rendues côté serveur par un petit service FastAPI, avec CSS. Tout reste en Python, sans second écosystème (Node, build).
 - **[Reco] Un seul serveur MySQL, deux schémas, deux comptes** : chaque service a son schéma et un utilisateur MySQL qui n'a de droits que sur celui-ci. On respecte E-03 sans faire tourner deux bases.
 - **[Reco] Pas de message broker au départ.** Kafka/RabbitMQ sont au programme (E-02) mais un CronJob suffit pour du scraping périodique. Option si le temps le permet : le scraper publie dans une file et le `tournament-service` consomme.
-- **[Reco] gRPC en option** (bonus T-02) : candidat naturel pour l'appel interne `scraper → tournament-service`, à faire seulement une fois REST terminé.
+- **gRPC pour l'import** (bonus T-02, étape 12) : le scraper envoie chaque tournoi au `tournament-service` par l'appel gRPC `TournamentImporter.Import` (port 50051, interne au cluster). Le contrat typé est `services/tournament-service/app/tournament.proto`, copié à l'identique dans `services/scraper/` (un test le vérifie). Les classes Python sont générées au démarrage par `grpc.protos_and_services`, sans fichier généré à maintenir. La validation (Pydantic) et la transaction sont les mêmes que pour la route REST `/internal/import`, gardée pour les essais via Swagger. L'enrichissement PokéAPI reste en REST.
 
 ## 2. API REST (première version)
 
@@ -65,7 +65,7 @@ Préfixes routés par la gateway. Les routes en écriture exigent un jeton.
 | GET | `/api/stats/matchups` | tournament | Winrate par matchup (F-06), si les données de matchs existent |
 | POST | `/api/teams` | tournament | Enregistrer une équipe construite (étape 3), jeton requis, Pokémon légaux seulement |
 | GET | `/api/teams` | tournament | Équipes de l'utilisateur du jeton |
-| POST | `/internal/import` | tournament | Import par le scraper, non exposé par la gateway |
+| POST | `/internal/import` | tournament | Import d'un tournoi (même code que l'appel gRPC du scraper), pour les essais ; non exposé par la gateway |
 | GET / POST | `/internal/enrich/missing`, `/internal/enrich` | tournament | Noms à enrichir, puis données PokéAPI envoyées par le scraper, non exposés |
 | POST | `/api/auth/register` | user | Inscription |
 | POST | `/api/auth/login` | user | Connexion, renvoie un JWT |
@@ -178,8 +178,8 @@ CREATE TABLE app_user (
 
 1. Le CronJob lance `scraper` (par exemple une fois par jour).
 2. Le scraper liste les tournois VGC récents sur la source (les `SCRAPE_LIMIT` derniers). Ceux déjà importés sont ignorés par l'import lui-même, qui est idempotent sur `source_url`.
-3. Pour chaque nouveau tournoi, il extrait tous les joueurs (classés et abandons), leurs équipes et tous les matchs, normalise les noms de Pokémon, puis envoie un JSON à `POST /internal/import`.
-4. Le `tournament-service` valide le JSON (Pydantic), crée les Pokémon et joueurs inconnus, et écrit le tout **dans une seule transaction**.
+3. Pour chaque nouveau tournoi, il extrait tous les joueurs (classés et abandons), leurs équipes et tous les matchs, normalise les noms de Pokémon, puis l'envoie par gRPC (`TournamentImporter.Import`, port 50051).
+4. Le `tournament-service` valide les données (Pydantic), crée les Pokémon et joueurs inconnus, et écrit le tout **dans une seule transaction**.
 
 **Source et règles de scraping** (choix du 14/10) : l'API JSON publique de play.limitlesstcg.com (`/tournaments?game=VGC`, `/tournaments/{id}/details`, `/standings`, `/pairings`), plus stable que du HTML, donc `requests` seul. Source de secours si besoin : limitlessvgc.com (HTML, tournois officiels). Délai d'une seconde entre requêtes et `User-Agent` explicite ; jamais de requête réelle pendant les tests, qui utilisent des réponses enregistrées dans `tests/fixtures/`. Les parseurs `parse_standings()` et `parse_pairings()` sont des fonctions pures, testables hors réseau. Côté `/pairings` : `player2` absent = bye, `winner` = 0 nul, -1 double défaite (vérifié sur une vraie réponse).
 
