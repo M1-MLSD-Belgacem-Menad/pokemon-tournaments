@@ -32,7 +32,9 @@ class Match(BaseModel):
 
 
 class TournamentImport(BaseModel):
-    source_url: str
+    source_url: str = Field(
+        pattern=r"^https?://", max_length=500
+    )  # affiché en lien : pas de javascript:
     name: str
     date: datetime.date
     format: str
