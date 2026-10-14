@@ -16,7 +16,7 @@ class TeamPokemon(BaseModel):
 
 class Standing(BaseModel):
     player: str  # source_id d'un joueur de `players`
-    placement: int = Field(ge=1)
+    placement: int | None = Field(ge=1)  # obligatoire, null pour un abandon
     wins: int | None = None
     losses: int | None = None
     ties: int | None = None

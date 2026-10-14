@@ -45,7 +45,9 @@ def tournaments(request: Request):
 
 @app.get("/tournaments/{tournament_id}", response_class=HTMLResponse)
 def tournament(request: Request, tournament_id: int):
-    """Détail d'un tournoi : top 16 et équipes."""
+    """Détail d'un tournoi : top 16 et équipes (l'API a tous les joueurs, on ne demande que ça)."""
     return templates.TemplateResponse(
-        request, "tournament.html", {"t": api_get(f"/api/tournaments/{tournament_id}")}
+        request,
+        "tournament.html",
+        {"t": api_get(f"/api/tournaments/{tournament_id}?top=16")},
     )

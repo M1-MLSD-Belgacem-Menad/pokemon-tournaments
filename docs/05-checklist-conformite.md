@@ -26,7 +26,7 @@
 - [ ] F-03 Inscription et connexion fonctionnent
 - [ ] F-04 Saisie d'un tournoi local, niveau « vainqueur » et niveau « top 16 »
 - [ ] F-05 Le créateur d'équipes n'accepte que les Pokémon légaux du règlement VGC en vigueur
-- [ ] F-06 Winrates par paire de Pokémon et par matchup (matchs du top 16)
+- [ ] F-06 Winrates par paire de Pokémon et par matchup (tous les matchs des tournois enregistrés)
 
 ## Principes du cours (E-xx)
 

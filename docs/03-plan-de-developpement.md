@@ -41,8 +41,8 @@ Le détail du workflow GitHub est dans le [guide de contribution](04-guide-de-co
 | S3 | 28 oct.–3 nov. | Premier déploiement | Image sur Docker Hub (publiée par la CI), Deployment + Service sur minikube, puis Ingress | 10 → 12 |
 | S4 | 4–10 nov. | Étape 1 complète + MySQL dans le cluster | Scraper en CronJob qui importe un vrai top 16 ; MySQL + PVC + Secret dans K8s ; frontend : liste et détail des tournois | 14 → 16 |
 | S5 | 11–17 nov. | Étape 2 : utilisateurs | `user-service` (inscription, connexion, JWT) déployé ; saisie d'un tournoi local (vainqueur ou top 16) | 14 consolidé |
-| S6 | 18–24 nov. | Enrichissement + étape 3 (début) | Migrations 002 à 006 selon le temps (types d'abord) ; formats et Pokémon légaux ; écran de construction d'équipe | — |
-| S7 | 25 nov.–1er déc. | Étape 3 : statistiques | Winrates par Pokémon et par paire ; matchups à partir des matchs du top 16 ; sauvegarde d'équipe | — |
+| S6 | 18–24 nov. | Enrichissement + étape 3 (début) | Migrations 003 à 007 selon le temps (types d'abord) ; formats et Pokémon légaux ; écran de construction d'équipe | — |
+| S7 | 25 nov.–1er déc. | Étape 3 : statistiques | Winrates par Pokémon et par paire ; matchups à partir de tous les matchs du tournoi ; sauvegarde d'équipe | — |
 | S8 | 2–8 déc. | Sécurité du cluster | RBAC, conteneurs non-root, NetworkPolicy, HTTPS sur l'Ingress ; mTLS Istio si possible | 18 |
 | S9 | 9–15 déc. | Bonus et rendu | Option cloud (GKE + Terraform) ou gRPC ; mini rapport avec captures ; PDF unique ; release `v1.0.0` | 20 (bonus) |
 
@@ -70,7 +70,7 @@ Les labs Google (L-03, L-04) sont individuels et indépendants du code : **[Reco
 
 ### Étape 3 : créateur d'équipes
 
-- [ ] Définir le format courant et sa liste de Pokémon légaux (migration 008).
+- [ ] Définir le format courant et sa liste de Pokémon légaux (migration 009).
 - [ ] Écran de construction limité aux Pokémon légaux (contrôle aussi côté API).
 - [ ] Requêtes de statistiques et tests sur un jeu de données connu.
 - [ ] Sauvegarde d'équipes par utilisateur.
