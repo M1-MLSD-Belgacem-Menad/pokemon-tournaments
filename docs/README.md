@@ -2,7 +2,7 @@
 
 Application web autour des résultats de tournois Pokémon : recensement des tournois par scraping, espace utilisateur pour saisir des tournois locaux, et créateur d'équipes avec statistiques de winrate. Projet de M1 (cours de programmation distribuée), réalisé en deux mois.
 
-> **Statut** : étape 12 du [plan par étapes](06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL, avec objets, talents, attaques, types et statistiques), `user-service` (inscription, connexion, JWT), `scraper` (Limitless, puis enrichissement par PokéAPI), `frontend` (liste et détail des tournois, connexion, saisie d'un tournoi local, créateur d'équipe avec winrates), Docker Compose, CI, publication Docker Hub et manifestes Kubernetes (Ingress HTTPS, scraper quotidien, comptes de service sans droits, NetworkPolicy). Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
+> **Statut** : étape 12 du [plan par étapes](06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL, avec objets, talents, attaques, types et statistiques), `user-service` (inscription, connexion, JWT), `scraper` (Limitless, import par gRPC, puis enrichissement par PokéAPI), `frontend` (liste et détail des tournois, connexion, saisie d'un tournoi local, créateur d'équipe avec winrates), Docker Compose, CI, publication Docker Hub et manifestes Kubernetes (Ingress HTTPS, scraper quotidien, comptes de service sans droits, NetworkPolicy). Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
 
 ## Documentation
 
@@ -27,7 +27,7 @@ Application web autour des résultats de tournois Pokémon : recensement des tou
 | Élément | Choix | Origine |
 |---|---|---|
 | Langage | Python | Plan de projet |
-| API | FastAPI (REST), gRPC en option | Sujet : REST/gRPC ; FastAPI = recommandation |
+| API | FastAPI (REST), gRPC pour l'import des tournois | Sujet : REST/gRPC ; FastAPI = recommandation |
 | Base de données | MySQL | Plan de projet |
 | Conteneurs | Docker, Docker Compose | Sujet et plan |
 | Orchestration | Kubernetes (minikube), Ingress | Sujet (imposé) |
@@ -118,7 +118,7 @@ kubectl -n pokemon logs -f job/scraper-manuel
 kubectl -n pokemon delete job scraper-manuel   # avant de le relancer
 ```
 
-Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t menadacheraiou/pokemon-tournament:0.5.0 services/tournament-service` (idem pour le frontend et le scraper), avant `kubectl apply -k k8s/`.
+Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t menadacheraiou/pokemon-tournament:0.6.0 services/tournament-service` (idem pour le frontend et le scraper), avant `kubectl apply -k k8s/`.
 
 ### Sécurité du cluster
 
@@ -137,6 +137,8 @@ kubectl auth can-i --as=system:serviceaccount:pokemon:frontend get secrets -n po
 kubectl auth can-i --as=system:serviceaccount:pokemon:tournament-service list pods -n pokemon
 # L'import reste fermé depuis l'extérieur : 404 (curl.exe sous PowerShell).
 curl -k -X POST https://pokemon.local/internal/import
+# Le port gRPC n'accepte que le scraper : le frontend obtient un TimeoutError.
+kubectl -n pokemon exec deploy/frontend -- .venv/bin/python -c "import socket; socket.create_connection(('tournament-service', 50051), timeout=3)"
 ```
 
 ## Publier une version
@@ -144,8 +146,8 @@ curl -k -X POST https://pokemon.local/internal/import
 Au push d'un tag `v*`, si le lint et les tests passent, la CI construit les images et les publie sur Docker Hub avec la version du tag (`v0.1.0` donne `pokemon-tournament:0.1.0`). Il faut une fois les secrets GitHub `DOCKERHUB_USERNAME` (le compte Docker Hub en minuscules, le même que dans `k8s/kustomization.yaml`) et `DOCKERHUB_TOKEN` (*Settings > Secrets and variables > Actions*).
 
 ```bash
-git tag v0.5.0
-git push origin v0.5.0
+git tag v0.6.0
+git push origin v0.6.0
 ```
 
 ## Usage

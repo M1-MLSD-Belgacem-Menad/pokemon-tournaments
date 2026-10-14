@@ -1,0 +1,56 @@
+// Contrat gRPC entre le scraper (client) et le tournament-service (serveur).
+// Copie identique dans services/scraper/ (un test le vérifie) : chaque image ne voit que son dossier.
+syntax = "proto3";
+
+package tournament;
+
+service TournamentImporter {
+  // Import d'un tournoi scrapé, en une transaction ; déjà importé (même source_url) : created = false.
+  rpc Import(TournamentImport) returns (ImportResult);
+}
+
+message Player {
+  string source_id = 1;
+  string name = 2;
+  optional string country = 3;
+}
+
+message TeamPokemon {
+  string name = 1;
+  optional string item = 2;
+  optional string ability = 3;
+  repeated string moves = 4;
+}
+
+message Standing {
+  string player = 1;  // source_id d'un joueur de `players`
+  optional int32 placement = 2;  // absent : abandon
+  optional int32 wins = 3;
+  optional int32 losses = 4;
+  optional int32 ties = 5;
+  repeated TeamPokemon team = 6;
+}
+
+message Match {
+  int32 phase = 1;
+  int32 round = 2;
+  string player1 = 3;
+  optional string player2 = 4;  // absent : bye
+  optional string winner = 5;  // absent : nul ou double défaite
+}
+
+message TournamentImport {
+  string source_url = 1;
+  string name = 2;
+  string date = 3;  // AAAA-MM-JJ
+  string format = 4;
+  optional int32 player_count = 5;
+  repeated Player players = 6;
+  repeated Standing standings = 7;
+  repeated Match matches = 8;
+}
+
+message ImportResult {
+  int32 id = 1;
+  bool created = 2;
+}

@@ -1,6 +1,7 @@
 """Scraper : récupère les tournois VGC récents sur play.limitlesstcg.com et les envoie au tournament-service.
 
 Source : API JSON publique, sans clé (https://docs.limitlesstcg.com/developer).
+Envoi : gRPC (TOURNAMENT_GRPC_TARGET) pour les tournois, REST (TOURNAMENT_API_URL) pour l'enrichissement.
 Usage : python scraper.py              -> les SCRAPE_LIMIT derniers tournois VGC, puis enrich
         python scraper.py <tournoi_id> -> un ou plusieurs tournois précis, puis enrich
         python scraper.py enrich       -> seulement l'enrichissement PokéAPI
@@ -17,11 +18,15 @@ import sys
 import time
 import unicodedata
 
+import grpc
 import requests
+from google.protobuf import json_format
 
 API = "https://play.limitlesstcg.com/api"
 HEADERS = {"User-Agent": "M1-projet-pokemon/0.1 (projet etudiant)"}
 DELAY = 1  # secondes entre deux requêtes vers Limitless
+# Import par gRPC (contrat : tournament.proto, copie de celui du tournament-service).
+protos, services = grpc.protos_and_services("tournament.proto")
 
 
 def get_json(url, delay, params=None, missing_ok=False):
@@ -77,8 +82,6 @@ def parse_standings(standings):
                     "name": p["name"],
                     "item": clean(p.get("item")),
                     "ability": clean(p.get("ability")),
-                    "nature": clean(p.get("nature")),
-                    "tera": clean(p.get("tera")),
                     # Les champs vides ou null de Limitless ne font pas rejeter tout le tournoi.
                     "moves": [
                         m.strip() for m in p.get("attacks") or [] if m and m.strip()
@@ -139,18 +142,18 @@ def build_payload(tournament_id, details, standings, pairings):
     }
 
 
-def scrape(tournament_id, api_url):
+def scrape(tournament_id, importer):
+    """Télécharge un tournoi et l'envoie par gRPC (importer : stub TournamentImporter)."""
     payload = build_payload(
         tournament_id,
         get(f"/tournaments/{tournament_id}/details"),
         get(f"/tournaments/{tournament_id}/standings"),
         get(f"/tournaments/{tournament_id}/pairings"),
     )
-    resp = requests.post(
-        f"{api_url}/internal/import", json=payload, timeout=120
+    result = importer.Import(
+        json_format.ParseDict(payload, protos.TournamentImport()), timeout=120
     )  # gros tournois
-    resp.raise_for_status()
-    status = "importé" if resp.status_code == 201 else "déjà en base"
+    status = "importé" if result.created else "déjà en base"
     print(f"{payload['name']} ({tournament_id}) : {status}", flush=True)
 
 
@@ -280,12 +283,15 @@ def main():
             t["id"] for t in get("/tournaments", game="VGC", limit=limit) if is_over(t)
         ]
     failed = 0
-    for tid in ids:
-        try:
-            scrape(tid, api_url)
-        except Exception as e:  # noqa: BLE001 (un tournoi en erreur ne bloque pas les suivants)
-            failed += 1
-            print(f"échec pour {tid} : {e!r}", file=sys.stderr, flush=True)
+    if ids:  # `enrich` seul n'a pas besoin de TOURNAMENT_GRPC_TARGET
+        with grpc.insecure_channel(os.environ["TOURNAMENT_GRPC_TARGET"]) as channel:
+            importer = services.TournamentImporterStub(channel)
+            for tid in ids:
+                try:
+                    scrape(tid, importer)
+                except Exception as e:  # noqa: BLE001 (un tournoi en erreur ne bloque pas les suivants)
+                    failed += 1
+                    print(f"échec pour {tid} : {e!r}", file=sys.stderr, flush=True)
     try:
         enrich(api_url)
     except Exception as e:  # noqa: BLE001 (les tournois importés restent importés)

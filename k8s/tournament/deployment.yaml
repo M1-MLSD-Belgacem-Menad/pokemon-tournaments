@@ -59,7 +59,8 @@ spec:
               valueFrom:
                 secretKeyRef: { name: app-secrets, key: JWT_SECRET }
           ports:
-            - containerPort: 8000
+            - { name: http, containerPort: 8000 }
+            - { name: grpc, containerPort: 50051 }  # import des tournois par le scraper
           # Les migrations tournent au démarrage : la liveness n'agit qu'une fois /health joignable,
           # pour ne pas tuer un pod au milieu d'une migration (DDL MySQL non atomique).
           startupProbe:
