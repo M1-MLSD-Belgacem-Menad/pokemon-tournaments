@@ -2,7 +2,7 @@
 
 Application web autour des résultats de tournois Pokémon : recensement des tournois par scraping, espace utilisateur pour saisir des tournois locaux, et créateur d'équipes avec statistiques de winrate. Projet de M1 (cours de programmation distribuée), réalisé en deux mois.
 
-> **Statut** : étape 10 du [plan par étapes](06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL, avec objets, talents et attaques), `user-service` (inscription, connexion, JWT), `scraper` (Limitless), `frontend` (liste et détail des tournois, connexion, saisie d'un tournoi local, créateur d'équipe avec winrates), Docker Compose, CI, publication Docker Hub et manifestes Kubernetes (Ingress, scraper quotidien). Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
+> **Statut** : étape 11 du [plan par étapes](06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL, avec objets, talents et attaques), `user-service` (inscription, connexion, JWT), `scraper` (Limitless), `frontend` (liste et détail des tournois, connexion, saisie d'un tournoi local, créateur d'équipe avec winrates), Docker Compose, CI, publication Docker Hub et manifestes Kubernetes (Ingress HTTPS, scraper quotidien, comptes de service sans droits, NetworkPolicy). Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
 
 ## Documentation
 
@@ -87,12 +87,17 @@ docker compose down -v     # repart d'une base vide
 Les images sont tirées de Docker Hub (`menadacheraiou/pokemon-<service>`) : il faut d'abord [publier la version](#publier-une-version) indiquée dans `k8s/kustomization.yaml`, qui fixe le compte et la version des images pour le cluster.
 
 ```bash
-minikube start
+# Calico applique les NetworkPolicy (le réseau par défaut de minikube les ignore).
+# Un cluster créé sans Calico garde son réseau : le recréer avec minikube delete.
+minikube start --cni=calico
 minikube addons enable ingress
 
 kubectl apply -f k8s/namespace.yaml
 # Mots de passe et clé JWT repris du .env de Compose : ils ne sont jamais dans le dépôt.
 kubectl -n pokemon create secret generic app-secrets --from-env-file=.env
+# Certificat HTTPS auto-signé pour pokemon.local (tls.key et tls.crt ne sont pas versionnés).
+docker run --rm -v "${PWD}:/out" -w /out alpine/openssl:3.5.8 req -x509 -newkey rsa:2048 -nodes -days 365 -subj "/CN=pokemon.local" -addext "subjectAltName=DNS:pokemon.local" -keyout tls.key -out tls.crt
+kubectl -n pokemon create secret tls pokemon-tls --cert=tls.crt --key=tls.key
 kubectl apply -k k8s/
 
 kubectl -n pokemon get pods,svc,pvc,ingress,cronjob
@@ -100,7 +105,7 @@ kubectl -n pokemon get pods,svc,pvc,ingress,cronjob
 
 Au premier lancement, les pods `tournament-service` restent en `Init` le temps que MySQL s'initialise. Les données survivent à `kubectl -n pokemon delete pod -l app=mysql` (volume persistant). Comme avec Compose, les bases et leurs comptes ne sont créés qu'au premier démarrage : un cluster déployé avant l'étape 7 repart de zéro avec `kubectl delete namespace pokemon`, puis les commandes ci-dessus.
 
-L'application s'ouvre à l'adresse donnée par `minikube ip`. Sous Windows ou macOS (pilote Docker), lancer `minikube tunnel` dans un autre terminal et ouvrir http://127.0.0.1. L'Ingress envoie `/api/auth` au `user-service`, le reste de `/api` au `tournament-service` et tout le reste au frontend ; `/internal/` (l'import) n'est pas exposé hors du cluster.
+L'application répond sur https://pokemon.local. Il faut faire pointer ce nom vers le cluster dans le fichier hosts (`C:\Windows\System32\drivers\etc\hosts` sous Windows, `/etc/hosts` ailleurs) : `127.0.0.1 pokemon.local` sous Windows ou macOS avec `minikube tunnel` lancé dans un autre terminal (pilote Docker), sinon l'adresse donnée par `minikube ip`. Le navigateur prévient que le certificat est auto-signé : l'accepter une fois. Le HTTP est redirigé vers le HTTPS. L'Ingress envoie `/api/auth` au `user-service`, le reste de `/api` au `tournament-service` et tout le reste au frontend ; `/internal/` (l'import) n'est pas exposé hors du cluster.
 
 Le scraper tourne chaque jour à 6 h, heure de Paris (CronJob). Pour le lancer tout de suite :
 
@@ -110,15 +115,34 @@ kubectl -n pokemon logs -f job/scraper-manuel
 kubectl -n pokemon delete job scraper-manuel   # avant de le relancer
 ```
 
-Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t menadacheraiou/pokemon-tournament:0.1.0 services/tournament-service` (idem pour le frontend et le scraper), avant `kubectl apply -k k8s/`.
+Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t menadacheraiou/pokemon-tournament:0.5.0 services/tournament-service` (idem pour le frontend et le scraper), avant `kubectl apply -k k8s/`.
+
+### Sécurité du cluster
+
+- Pods sans root (`runAsNonRoot`, utilisateur `nobody`), sans élévation de privilèges ni capacités Linux. MySQL fait exception : son image démarre en root avant de passer à l'utilisateur `mysql`.
+- Un ServiceAccount par service, sans aucun droit sur l'API Kubernetes (aucun service ne l'appelle) et sans jeton monté (`k8s/rbac.yaml`).
+- NetworkPolicy (`k8s/network-policies.yaml`) : tout trafic entrant est refusé, sauf MySQL depuis le `tournament-service` et le `user-service`, le `tournament-service` depuis le frontend, le scraper et l'Ingress, le `user-service` depuis le frontend et l'Ingress, le frontend depuis l'Ingress.
+
+Vérifications :
+
+```bash
+# Le frontend ne joint pas MySQL (TimeoutError), le tournament-service si (pas d'erreur).
+kubectl -n pokemon exec deploy/frontend -- .venv/bin/python -c "import socket; socket.create_connection(('mysql', 3306), timeout=3)"
+kubectl -n pokemon exec deploy/tournament-service -- .venv/bin/python -c "import socket; socket.create_connection(('mysql', 3306), timeout=3)"
+# Aucun droit sur l'API Kubernetes : « no ».
+kubectl auth can-i --as=system:serviceaccount:pokemon:frontend get secrets -n pokemon
+kubectl auth can-i --as=system:serviceaccount:pokemon:tournament-service list pods -n pokemon
+# L'import reste fermé depuis l'extérieur : 404 (curl.exe sous PowerShell).
+curl -k -X POST https://pokemon.local/internal/import
+```
 
 ## Publier une version
 
 Au push d'un tag `v*`, si le lint et les tests passent, la CI construit les images et les publie sur Docker Hub avec la version du tag (`v0.1.0` donne `pokemon-tournament:0.1.0`). Il faut une fois les secrets GitHub `DOCKERHUB_USERNAME` (le compte Docker Hub en minuscules, le même que dans `k8s/kustomization.yaml`) et `DOCKERHUB_TOKEN` (*Settings > Secrets and variables > Actions*).
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.5.0
+git push origin v0.5.0
 ```
 
 ## Usage
