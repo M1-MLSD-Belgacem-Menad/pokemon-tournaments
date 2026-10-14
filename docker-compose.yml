@@ -26,6 +26,7 @@ services:
       DB_USER: ${TOURNAMENT_DB_USER}
       DB_PASSWORD: ${TOURNAMENT_DB_PASSWORD}
       DB_NAME: tournament_db
+      JWT_SECRET: ${JWT_SECRET:?à définir dans .env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -55,9 +56,12 @@ services:
     build: services/frontend
     environment:
       TOURNAMENT_API_URL: http://tournament-service:8000
+      USER_API_URL: http://user-service:8000
     depends_on:
       tournament-service:
         condition: service_healthy
+      user-service:
+        condition: service_started
     ports:
       - "8080:8000"
 

@@ -42,6 +42,10 @@ spec:
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef: { name: app-secrets, key: TOURNAMENT_DB_PASSWORD }
+            # Même clé que le user-service : vérifie les jetons des tournois saisis.
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: JWT_SECRET }
           ports:
             - containerPort: 8000
           # Les migrations tournent au démarrage : la liveness n'agit qu'une fois /health joignable,
