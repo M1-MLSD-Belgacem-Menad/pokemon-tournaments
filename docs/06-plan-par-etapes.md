@@ -150,9 +150,9 @@ Une migration et une PR chacune, dans l'ordre de F-02, en s'arrêtant quand le t
 
 ## Étape 11 : sécurité du cluster (S8, 2–8 déc.)
 
-Dans l'ordre de `docs/02` : conteneurs non-root (`USER` dans chaque Dockerfile), ServiceAccount + Role minimal par service, `NetworkPolicy` (seuls les services propriétaires parlent à MySQL), HTTPS sur l'Ingress (certificat auto-signé dans un Secret TLS). Istio et mTLS seulement s'il reste du temps et de la mémoire.
+Dans l'ordre de `docs/02` : conteneurs non-root (`USER` dans chaque Dockerfile), ServiceAccount par service (sans Role : aucun service n'appelle l'API Kubernetes, le minimum est donc aucun droit), `NetworkPolicy` (seuls les services propriétaires parlent à MySQL), HTTPS sur l'Ingress (certificat auto-signé dans un Secret TLS). Istio et mTLS seulement s'il reste du temps et de la mémoire.
 
-**Critère de réussite** : un pod `frontend` ne peut pas joindre MySQL (`nc` échoue) ; l'appli répond en `https://` ; `kubectl auth can-i` montre les droits restreints. Palier **18**. Tag **`v0.5.0`**.
+**Critère de réussite** : un pod `frontend` ne peut pas joindre MySQL (`nc` échoue) ; l'appli répond en `https://pokemon.local` (depuis cette étape, l'Ingress ne répond plus sur la seule IP de `minikube ip`) ; `kubectl auth can-i` montre les droits restreints. Palier **18**. Tag **`v0.5.0`**.
 
 ## Étape 12 : bonus (S9, 9–15 déc.)
 

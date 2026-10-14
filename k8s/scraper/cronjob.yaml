@@ -11,11 +11,23 @@ spec:
     spec:
       backoffLimit: 0  # pas de relance : un tournoi en erreur le restera, le passage du lendemain suffit
       template:
+        metadata:
+          labels:
+            app: scraper  # autorisé à appeler le tournament-service (k8s/network-policies.yaml)
         spec:
           restartPolicy: Never
+          serviceAccountName: scraper
+          automountServiceAccountToken: false  # aucun service n'appelle l'API Kubernetes
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534  # nobody, comme le USER des Dockerfiles
+            seccompProfile: { type: RuntimeDefault }
           containers:
             - name: scraper
               image: pokemon-scraper  # compte et version : k8s/kustomization.yaml
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: { drop: [ALL] }
               env:
                 # Appel par le nom DNS interne du Service, sans passer par l'Ingress.
                 - name: TOURNAMENT_API_URL

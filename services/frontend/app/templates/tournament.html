@@ -21,6 +21,8 @@
           {% if p.ability %}<div class="ability">{{ p.ability }}</div>{% endif %}
           {% if p.moves %}<ul class="moves">{% for m in p.moves %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
         </div>
+      {% else %}
+        <span class="meta">équipe non publiée par l'organisateur</span>
       {% endfor %}
       </td>
     </tr>

@@ -35,3 +35,7 @@ __pycache__/
 .idea/
 .agent/
 .postman/
+
+# --- Certificat HTTPS de minikube (README) ---
+tls.key
+tls.crt

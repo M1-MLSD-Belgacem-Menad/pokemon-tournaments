@@ -97,12 +97,19 @@ def error_message(body: dict) -> str:
     return " ; ".join(messages)
 
 
-def logged_in(token: str) -> RedirectResponse:
+def logged_in(request: Request, token: str) -> RedirectResponse:
     resp = RedirectResponse("/", status_code=303)
-    # HttpOnly : illisible en JavaScript. SameSite=Lax : pas envoyé par un formulaire d'un autre site.
-    # ponytail: pas de `secure` tant que l'Ingress est en HTTP, à ajouter avec HTTPS (étape 11).
-    resp.set_cookie("token", token, max_age=24 * 3600, httponly=True, samesite="lax")
+    resp.set_cookie("token", token, max_age=24 * 3600, **cookie_flags(request))
     return resp
+
+
+def cookie_flags(request: Request) -> dict:
+    """HttpOnly : illisible en JavaScript. SameSite=Lax : pas envoyé par un formulaire d'un autre site.
+    Secure derrière l'Ingress HTTPS, qui ajoute X-Forwarded-Proto (Compose reste en HTTP).
+    Le frontend n'est joignable que par l'Ingress (NetworkPolicy) : l'en-tête est fiable.
+    """
+    https = request.headers.get("x-forwarded-proto") == "https"
+    return {"httponly": True, "samesite": "lax", "secure": https}
 
 
 @app.get("/health")
@@ -282,7 +289,7 @@ def login(
         f"{USER_API_URL}/api/auth/login", {"username": username, "password": password}
     )
     if code == 200:
-        return logged_in(body["access_token"])
+        return logged_in(request, body["access_token"])
     return templates.TemplateResponse(
         request,
         "login.html",
@@ -311,7 +318,7 @@ def register(
             {"username": username, "password": password},
         )
         if code == 200:
-            return logged_in(body["access_token"])
+            return logged_in(request, body["access_token"])
         return RedirectResponse("/login", status_code=303)  # compte créé : se connecter
     return templates.TemplateResponse(
         request,
@@ -322,7 +329,9 @@ def register(
 
 
 @app.post("/logout")
-def logout():
+def logout(request: Request):
     resp = RedirectResponse("/", status_code=303)
-    resp.delete_cookie("token")
+    resp.delete_cookie(
+        "token", **cookie_flags(request)
+    )  # mêmes attributs qu'à la connexion
     return resp
