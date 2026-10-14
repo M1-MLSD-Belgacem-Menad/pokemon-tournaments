@@ -2,7 +2,7 @@
 
 Application web autour des résultats de tournois Pokémon : recensement des tournois par scraping, espace utilisateur pour saisir des tournois locaux, et créateur d'équipes avec statistiques de winrate. Projet de M1 (cours de programmation distribuée), réalisé en deux mois.
 
-> **Statut** : documentation de conception. Le code n'existe pas encore ; les commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](docs/02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
+> **Statut** : étape 1 du [plan par étapes](docs/06-plan-par-etapes.md) en cours. Seul le socle existe (`tournament-service` qui répond sur `/health`, MySQL dans Docker Compose, CI). Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](docs/02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
 
 ## Documentation
 
@@ -14,6 +14,7 @@ Application web autour des résultats de tournois Pokémon : recensement des tou
 | [03-plan-de-developpement.md](docs/03-plan-de-developpement.md) | Organisation, calendrier sur 9 semaines (14 oct. – 15 déc.), risques |
 | [04-guide-de-contribution.md](docs/04-guide-de-contribution.md) | Workflow GitHub, conventions de code, de commit et de test |
 | [05-checklist-conformite.md](docs/05-checklist-conformite.md) | Liste à cocher avant le rendu |
+| [06-plan-par-etapes.md](docs/06-plan-par-etapes.md) | Les 13 étapes de réalisation, avec résultat attendu et critère de réussite |
 
 ## Fonctionnalités
 
@@ -30,7 +31,7 @@ Application web autour des résultats de tournois Pokémon : recensement des tou
 | Base de données | MySQL | Plan de projet |
 | Conteneurs | Docker, Docker Compose | Sujet et plan |
 | Orchestration | Kubernetes (minikube), Ingress | Sujet (imposé) |
-| Scraping | requests + BeautifulSoup | Plan : scraping Python ; bibliothèques = recommandation |
+| Scraping | requests (API JSON de Limitless) | Plan : scraping Python ; bibliothèque = recommandation |
 | Versioning, CI | GitHub, GitHub Actions | Plan : GitHub ; Actions = recommandation |
 
 ## Architecture en bref
@@ -105,8 +106,8 @@ Puis ouvrir l'adresse donnée par `minikube ip` (ou utiliser `minikube tunnel` s
 
 ```bash
 cd services/tournament-service
-pip install -r requirements.txt
-pytest
+uv sync
+uv run pytest
 ```
 
 ## Décisions de cadrage (14 octobre 2026)

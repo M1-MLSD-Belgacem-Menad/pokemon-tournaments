@@ -17,7 +17,7 @@
 - [ ] T-11 Déploiement cloud (bonus)
 - [ ] T-16 Tout le code est sur GitHub
 - [ ] T-17 Les résultats viennent d'un scraper en Python
-- [ ] T-19 Pas de dépendance injustifiée (chaque bibliothèque des `requirements.txt` sert)
+- [ ] T-19 Pas de dépendance injustifiée (chaque bibliothèque des `pyproject.toml` sert)
 
 ## Fonctionnalités (PLAN)
 

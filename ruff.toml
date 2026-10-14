@@ -1,0 +1,2 @@
+# Chaque service a son propre paquet (app, scraper…) : on le déclare comme code du projet.
+src = ["services/*", "prototypes/*"]

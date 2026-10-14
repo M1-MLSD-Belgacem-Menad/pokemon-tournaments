@@ -49,8 +49,8 @@ Exemples : `feat(scraper): extraire le top 16 d'une page de tournoi`, `ci: publi
 
 ## 6. Code Python
 
-- Python 3.12 ; une `requirements.txt` par service avec des versions **fixées**.
-- `ruff` pour le lint et le formatage ; pas d'autre outil de style.
+- Python 3.12 ; un `pyproject.toml` par service géré avec `uv`, et son `uv.lock` committé (versions **fixées**). `uv sync` installe, `uv run pytest` teste.
+- `ruff` pour le lint et le formatage ; pas d'autre outil de style. Même version que la CI, depuis la racine : `uvx ruff@0.16.8 check .` et `uvx ruff@0.16.8 format .`.
 - Annotations de type sur les fonctions publiques ; modèles Pydantic pour toute donnée entrante.
 - Nommage : `snake_case` pour fonctions, variables, tables et colonnes SQL ; `PascalCase` pour les classes ; JSON des API en `snake_case` (**[Reco]**, à garder identique partout).
 - Configuration uniquement par variables d'environnement (E-06), documentées dans `.env.example`.
