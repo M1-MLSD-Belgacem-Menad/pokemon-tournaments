@@ -2,7 +2,7 @@
 
 Application web autour des résultats de tournois Pokémon : recensement des tournois par scraping, espace utilisateur pour saisir des tournois locaux, et créateur d'équipes avec statistiques de winrate. Projet de M1 (cours de programmation distribuée), réalisé en deux mois.
 
-> **Statut** : étape 5 du [plan par étapes](docs/06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL), `scraper` (Limitless), `frontend` (liste et détail des tournois), Docker Compose, CI, publication Docker Hub et manifestes Kubernetes. Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](docs/02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
+> **Statut** : étape 6 du [plan par étapes](docs/06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL), `scraper` (Limitless), `frontend` (liste et détail des tournois), Docker Compose, CI, publication Docker Hub et manifestes Kubernetes (Ingress, scraper quotidien). Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](docs/02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
 
 ## Documentation
 
@@ -88,19 +88,29 @@ Les images sont tirées de Docker Hub (`menadacheraiou/pokemon-<service>`) : il 
 
 ```bash
 minikube start
+minikube addons enable ingress
 
 kubectl apply -f k8s/namespace.yaml
 # Mots de passe repris du .env de Compose : ils ne sont jamais dans le dépôt.
 kubectl -n pokemon create secret generic mysql --from-env-file=.env
 kubectl apply -k k8s/
 
-kubectl -n pokemon get pods,svc,pvc
-kubectl -n pokemon port-forward svc/frontend 8080:8000
+kubectl -n pokemon get pods,svc,pvc,ingress,cronjob
 ```
 
-Puis ouvrir http://localhost:8080. Au premier lancement, les pods `tournament-service` restent en `Init` le temps que MySQL s'initialise. Les données survivent à `kubectl -n pokemon delete pod -l app=mysql` (volume persistant).
+Au premier lancement, les pods `tournament-service` restent en `Init` le temps que MySQL s'initialise. Les données survivent à `kubectl -n pokemon delete pod -l app=mysql` (volume persistant).
 
-Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t menadacheraiou/pokemon-tournament:0.1.0 services/tournament-service` (idem pour le frontend), avant `kubectl apply -k k8s/`.
+L'application s'ouvre à l'adresse donnée par `minikube ip`. Sous Windows ou macOS (pilote Docker), lancer `minikube tunnel` dans un autre terminal et ouvrir http://127.0.0.1. L'Ingress envoie `/api` au `tournament-service` et le reste au frontend ; `/internal/` (l'import) n'est pas exposé hors du cluster.
+
+Le scraper tourne chaque jour à 6 h, heure de Paris (CronJob). Pour le lancer tout de suite :
+
+```bash
+kubectl -n pokemon create job --from=cronjob/scraper scraper-manuel
+kubectl -n pokemon logs -f job/scraper-manuel
+kubectl -n pokemon delete job scraper-manuel   # avant de le relancer
+```
+
+Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t menadacheraiou/pokemon-tournament:0.1.0 services/tournament-service` (idem pour le frontend et le scraper), avant `kubectl apply -k k8s/`.
 
 ## Publier une version
 

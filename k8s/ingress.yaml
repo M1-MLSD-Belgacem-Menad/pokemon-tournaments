@@ -1,0 +1,23 @@
+# Gateway : seule entrée du cluster (minikube addons enable ingress).
+# /internal/ n'a pas de règle (seul le scraper, dans le cluster, l'appelle) : il tombe sur le frontend, qui répond 404.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gateway
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: tournament-service
+                port: { number: 8000 }
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port: { number: 8000 }

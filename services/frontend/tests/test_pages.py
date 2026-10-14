@@ -94,3 +94,8 @@ def test_api_injoignable_renvoie_503(monkeypatch):
 
     monkeypatch.setattr(main.urllib.request, "urlopen", down)
     assert client.get("/").status_code == 503
+
+
+def test_internal_not_served():
+    # L'Ingress envoie tout ce qui n'est pas /api au frontend : /internal/ doit y finir en 404.
+    assert client.post("/internal/import", json={}).status_code == 404
