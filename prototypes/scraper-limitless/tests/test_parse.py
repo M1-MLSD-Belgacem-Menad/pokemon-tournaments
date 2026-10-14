@@ -19,8 +19,11 @@ def test_equipe_detaillee():
     winner = parse_standings(load())[0]
     assert winner["wins"] == 10
     assert winner["team"][0] == {
-        "name": "Staraptor", "item": "Staraptite", "ability": "Intimidate",
-        "nature": "Jolly", "tera": None,
+        "name": "Staraptor",
+        "item": "Staraptite",
+        "ability": "Intimidate",
+        "nature": "Jolly",
+        "tera": None,
         "moves": ["Brave Bird", "Close Combat", "Tailwind", "Protect"],
     }
 
