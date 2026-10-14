@@ -1,16 +1,39 @@
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-.pytest_cache/
-.ruff_cache/
-
-# Secrets et configuration locale
+# --- Secrets et identifiants (ne jamais committer) ---
 .env
+*.env
+Compte Google labs.xlsx*
+Google labs.xlsx*
 
-# IDE et OS
+# --- Supports de cours (hors projet) ---
+Prog dist/
+Prog Web/
+*.pdf
+*.docx
+*.xlsx
+*.docx.md
+*.xlsx.md
+cloud native.md
+TP Rest Web Service.md
+files.zip
+~$*
+
+# --- TP Car Rental (autre cours, hors projet Pokémon) ---
+/main.py
+/test_main.py
+/requirements.txt
+/postman/
+/contexte_conversation.md
+/claude.md
+
+# --- Environnements Python et caches ---
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# --- Outils et IDE ---
 .idea/
-.vscode/
-.DS_Store
-Thumbs.db
+.claude/
+.agent/
+.postman/
