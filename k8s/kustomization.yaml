@@ -7,10 +7,17 @@ resources:
   - mysql/service.yaml
   - tournament/deployment.yaml
   - tournament/service.yaml
+  - user/deployment.yaml
+  - user/service.yaml
   - frontend/deployment.yaml
   - frontend/service.yaml
   - ingress.yaml
   - scraper/cronjob.yaml
+# Même script d'initialisation que Compose (k8s/mysql/initdb/).
+configMapGenerator:
+  - name: mysql-initdb
+    files:
+      - mysql/initdb/user-db.sh
 # Seul endroit où changer le compte Docker Hub et la version des images.
 images:
   - name: pokemon-tournament
@@ -21,4 +28,7 @@ images:
     newTag: "0.1.0"
   - name: pokemon-scraper
     newName: menadacheraiou/pokemon-scraper
+    newTag: "0.1.0"
+  - name: pokemon-user
+    newName: menadacheraiou/pokemon-user
     newTag: "0.1.0"

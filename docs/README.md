@@ -2,7 +2,7 @@
 
 Application web autour des résultats de tournois Pokémon : recensement des tournois par scraping, espace utilisateur pour saisir des tournois locaux, et créateur d'équipes avec statistiques de winrate. Projet de M1 (cours de programmation distribuée), réalisé en deux mois.
 
-> **Statut** : étape 6 du [plan par étapes](06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL), `scraper` (Limitless), `frontend` (liste et détail des tournois), Docker Compose, CI, publication Docker Hub et manifestes Kubernetes (Ingress, scraper quotidien). Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
+> **Statut** : étape 7 du [plan par étapes](06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL), `user-service` (inscription, connexion, JWT), `scraper` (Limitless), `frontend` (liste et détail des tournois), Docker Compose, CI, publication Docker Hub et manifestes Kubernetes (Ingress, scraper quotidien). Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
 
 ## Documentation
 
@@ -73,7 +73,7 @@ Lancer un scraping à la main :
 docker compose run --rm scraper
 ```
 
-Si la base a été créée avant l'étape 2 (sans `tournament_db`), repartir d'une base vide une fois avec `docker compose down -v`.
+Si la base a été créée avant l'étape 7 (sans `user_db`), repartir d'une base vide une fois avec `docker compose down -v` : les bases et leurs comptes ne sont créés qu'au premier démarrage de MySQL.
 
 Arrêter, et supprimer les données avec `-v` :
 
@@ -91,16 +91,16 @@ minikube start
 minikube addons enable ingress
 
 kubectl apply -f k8s/namespace.yaml
-# Mots de passe repris du .env de Compose : ils ne sont jamais dans le dépôt.
-kubectl -n pokemon create secret generic mysql --from-env-file=.env
+# Mots de passe et clé JWT repris du .env de Compose : ils ne sont jamais dans le dépôt.
+kubectl -n pokemon create secret generic app-secrets --from-env-file=.env
 kubectl apply -k k8s/
 
 kubectl -n pokemon get pods,svc,pvc,ingress,cronjob
 ```
 
-Au premier lancement, les pods `tournament-service` restent en `Init` le temps que MySQL s'initialise. Les données survivent à `kubectl -n pokemon delete pod -l app=mysql` (volume persistant).
+Au premier lancement, les pods `tournament-service` restent en `Init` le temps que MySQL s'initialise. Les données survivent à `kubectl -n pokemon delete pod -l app=mysql` (volume persistant). Comme avec Compose, les bases et leurs comptes ne sont créés qu'au premier démarrage : un cluster déployé avant l'étape 7 repart de zéro avec `kubectl delete namespace pokemon`, puis les commandes ci-dessus.
 
-L'application s'ouvre à l'adresse donnée par `minikube ip`. Sous Windows ou macOS (pilote Docker), lancer `minikube tunnel` dans un autre terminal et ouvrir http://127.0.0.1. L'Ingress envoie `/api` au `tournament-service` et le reste au frontend ; `/internal/` (l'import) n'est pas exposé hors du cluster.
+L'application s'ouvre à l'adresse donnée par `minikube ip`. Sous Windows ou macOS (pilote Docker), lancer `minikube tunnel` dans un autre terminal et ouvrir http://127.0.0.1. L'Ingress envoie `/api/auth` au `user-service`, le reste de `/api` au `tournament-service` et tout le reste au frontend ; `/internal/` (l'import) n'est pas exposé hors du cluster.
 
 Le scraper tourne chaque jour à 6 h, heure de Paris (CronJob). Pour le lancer tout de suite :
 
@@ -130,12 +130,12 @@ git push origin v0.1.0
 
 ## Tests
 
-Les tests du `tournament-service` utilisent une base MySQL jetable sur le port 3307 :
+Les tests du `tournament-service` et du `user-service` utilisent une base MySQL jetable sur le port 3307 :
 
 ```bash
 docker run --rm -d -p 3307:3306 -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=tournament_test --name mysql-test mysql:8.4
 until docker exec mysql-test mysql -uroot -ptest -e "SELECT 1" tournament_test >/dev/null 2>&1; do sleep 2; done
-cd services/tournament-service
+cd services/tournament-service   # ou services/user-service
 uv sync
 uv run pytest
 docker stop mysql-test

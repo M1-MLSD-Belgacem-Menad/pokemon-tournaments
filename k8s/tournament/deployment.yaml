@@ -38,10 +38,10 @@ spec:
               value: tournament_db
             - name: DB_USER
               valueFrom:
-                secretKeyRef: { name: mysql, key: TOURNAMENT_DB_USER }
+                secretKeyRef: { name: app-secrets, key: TOURNAMENT_DB_USER }
             - name: DB_PASSWORD
               valueFrom:
-                secretKeyRef: { name: mysql, key: TOURNAMENT_DB_PASSWORD }
+                secretKeyRef: { name: app-secrets, key: TOURNAMENT_DB_PASSWORD }
           ports:
             - containerPort: 8000
           # Les migrations tournent au démarrage : la liveness n'agit qu'une fois /health joignable,
