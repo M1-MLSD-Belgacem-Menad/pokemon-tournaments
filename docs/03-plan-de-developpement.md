@@ -70,7 +70,7 @@ Les labs Google (L-03, L-04) sont individuels et indépendants du code : **[Reco
 
 ### Étape 3 : créateur d'équipes
 
-- [ ] Définir le format courant et sa liste de Pokémon légaux (migration 009).
+- [ ] Définir le format courant et sa liste de Pokémon légaux (calculée depuis les tournois scrapés du format le plus récent).
 - [ ] Écran de construction limité aux Pokémon légaux (contrôle aussi côté API).
 - [ ] Requêtes de statistiques et tests sur un jeu de données connu.
 - [ ] Sauvegarde d'équipes par utilisateur.

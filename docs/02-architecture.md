@@ -58,11 +58,13 @@ Préfixes routés par la gateway. Les routes en écriture exigent un jeton.
 | GET | `/api/tournaments/{id}` | tournament | Détail + classement + équipes |
 | POST | `/api/tournaments` | tournament | Saisie d'un tournoi local (F-04), jeton requis |
 | GET | `/api/pokemon` / `/api/pokemon/{id}` | tournament | Données Pokémon (enrichies selon l'étape) |
-| GET | `/api/formats/{id}/legal-pokemon` | tournament | Pokémon légaux (F-05) |
+| GET | `/api/formats` | tournament | Formats joués, le plus récent (format courant) en premier |
+| GET | `/api/formats/{code}/legal-pokemon` | tournament | Pokémon légaux (F-05) : ceux joués dans les tournois scrapés du format |
 | GET | `/api/stats/pokemon` | tournament | Taux d'usage et winrate par Pokémon |
 | GET | `/api/stats/combinations` | tournament | Winrate par combinaison (F-06) |
 | GET | `/api/stats/matchups` | tournament | Winrate par matchup (F-06), si les données de matchs existent |
-| POST | `/api/teams` | tournament | Enregistrer une équipe construite (étape 3), jeton requis |
+| POST | `/api/teams` | tournament | Enregistrer une équipe construite (étape 3), jeton requis, Pokémon légaux seulement |
+| GET | `/api/teams` | tournament | Équipes de l'utilisateur du jeton |
 | POST | `/internal/import` | tournament | Import par le scraper, non exposé par la gateway |
 | POST | `/api/auth/register` | user | Inscription |
 | POST | `/api/auth/login` | user | Connexion, renvoie un JWT |
@@ -146,7 +148,7 @@ CREATE TABLE team_pokemon (
 | 006 | Objets | `item(id, name)`, colonne `team_pokemon.item_id` (nullable) |
 | 007 | Statistiques | `pokemon_stats(pokemon_id, hp, atk, def, spa, spd, spe)`, et colonnes `move.type_id`, `category`, `power`, depuis PokéAPI |
 | 008 | Étape 2 | `tournament.created_by` (id utilisateur, sans clé étrangère car il vit dans `user_db`), `tournament.detail_level ENUM('winner','top16')` |
-| 009 | Étape 3 | `format_legal_pokemon(format_id, pokemon_id)`, `saved_team(id, user_id, name, format_id)`, `saved_team_pokemon(saved_team_id, slot, pokemon_id)` |
+| 009 | Étape 3 | `saved_team(id, user_id, name, format_id)`, `saved_team_pokemon(saved_team_id, slot, pokemon_id)` ; les Pokémon légaux sont calculés (décision 6), pas stockés |
 
 Toutes les colonnes ajoutées après la v1 sont **nullables**, pour que les données déjà scrapées restent valides.
 
