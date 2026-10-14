@@ -1,7 +1,9 @@
 import os
 from pathlib import Path
+from typing import Annotated
 
 import pymysql
+from fastapi import Depends
 from pymysql.cursors import DictCursor
 
 MIGRATIONS = Path(__file__).parent.parent / "migrations"
@@ -26,6 +28,9 @@ def get_conn():
         yield conn
     finally:
         conn.close()
+
+
+Conn = Annotated[pymysql.Connection, Depends(get_conn)]
 
 
 def migrate(conn: pymysql.Connection) -> None:

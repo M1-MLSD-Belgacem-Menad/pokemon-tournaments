@@ -7,4 +7,16 @@ table { width: 100%; border-collapse: collapse; background: #fff; }
 th, td { padding: 0.5rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .meta, .country { color: var(--muted); }
 .team { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.mon { background: #eef; border-radius: 0.8rem; padding: 0.1rem 0.6rem; font-size: 0.9rem; }
+.mon { background: #eef; border-radius: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.85rem; min-width: 8rem; }
+.item, .ability { color: var(--muted); }
+.moves { margin: 0.2rem 0 0; padding-left: 1rem; }
+header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+nav { display: flex; gap: 1rem; align-items: center; }
+nav form { margin: 0; }
+nav button { background: none; border: 1px solid #fff; color: #fff; border-radius: 0.3rem; cursor: pointer; }
+.stack { display: flex; flex-direction: column; gap: 0.6rem; max-width: 24rem; margin-bottom: 1rem; }
+.stack label { display: flex; flex-direction: column; gap: 0.2rem; }
+.stack fieldset label { flex-direction: row; }
+.error { background: #fdecea; border-left: 4px solid var(--accent); padding: 0.6rem; }
+.ok { background: #eafaf1; border-left: 4px solid #27ae60; padding: 0.6rem; }
+.num { white-space: nowrap; }

@@ -37,7 +37,13 @@ def test_detail_has_top16_teams_and_matches(client, db):
     assert [s["placement"] for s in body["standings"]] == list(range(1, 17))
     first = body["standings"][0]
     assert first["player"] == "Joueur 1"
-    assert first["team"] == [
+    assert first["team"][0] == {
+        "name": "Rillaboom",
+        "item": "Sitrus Berry",
+        "ability": "Intimidate",
+        "moves": ["Protect", "Fake Out"],
+    }
+    assert [p["name"] for p in first["team"]] == [
         "Rillaboom",
         "Incineroar",
         "Urshifu",
@@ -56,3 +62,28 @@ def test_detail_has_top16_teams_and_matches(client, db):
 
 def test_detail_unknown_is_404(client, db):
     assert client.get("/api/tournaments/999").status_code == 404
+
+
+def test_detail_drops_after_ranked_players(client, db):
+    payload = make_payload()
+    # p17 a abandonné : pas de place. Placé en tête de liste pour vérifier le tri.
+    payload["standings"].insert(
+        0, {"player": "p17", "placement": None, "wins": 0, "losses": 2}
+    )
+    tid = client.post("/internal/import", json=payload).json()["id"]
+    standings = client.get(f"/api/tournaments/{tid}").json()["standings"]
+    assert [s["placement"] for s in standings] == list(range(1, 17)) + [None]
+    assert standings[-1]["player"] == "Joueur 17"
+
+
+def test_detail_top_keeps_first_players_and_their_matches(client, db):
+    payload = make_payload()
+    payload["standings"].insert(
+        0, {"player": "p17", "placement": None, "wins": 0, "losses": 2}
+    )
+    tid = client.post("/internal/import", json=payload).json()["id"]
+    body = client.get(f"/api/tournaments/{tid}?top=2").json()
+    assert [s["placement"] for s in body["standings"]] == [1, 2]
+    assert len(body["standings"][0]["team"]) == 6
+    # Les matchs de p1 (contre p17 et contre p2) restent, le bye de p3 non.
+    assert [m["round"] for m in body["matches"]] == [1, 2]

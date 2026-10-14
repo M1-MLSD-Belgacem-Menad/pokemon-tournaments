@@ -151,7 +151,7 @@ Points relevés à la lecture du dossier. Les décisions prises par Menad le 14 
 | 8 | **Devoir écrit MLSD** (date incohérente). | Hors périmètre de cette documentation. |
 | 9 | **« Format actuel »** non précisé. | **VGC**, combat en double, règlement en vigueur. |
 | 10 | **Sites à scraper** non désignés. | Traité dans un fil dédié. |
-| 11 | **Données de matchups** et définition de « combinaison d'équipe ». | Le classement top 16 **et les matchs qui ont qualifié ces joueurs** (leurs rondes) sont collectés. La définition de « combinaison » est laissée libre : on retient la plus simple, les **paires de Pokémon** d'une même équipe. |
+| 11 | **Données de matchups** et définition de « combinaison d'équipe ». | Le classement top 16 **et les matchs qui ont qualifié ces joueurs** (leurs rondes) sont collectés. Complété le 14/10 : **tous les joueurs et tous les matchs** sont enregistrés (winrates non biaisés par le seul top 16), seul le top 16 est affiché. La définition de « combinaison » est laissée libre : on retient la plus simple, les **paires de Pokémon** d'une même équipe. |
 | 12 | **Source de l'enrichissement** des Pokémon. | La plus simple : une API publique JSON (PokéAPI) pour types, talents et statistiques ; attaques et objets joués viennent des équipes scrapées. |
 | 13 | **Front-end** : niveau attendu non précisé. | Laissé au choix : pages HTML rendues par FastAPI + Jinja2, avec CSS. |
 | 14 | **« Base in memory »** (T-09). | Explication ci-dessous ; pas de décision requise. |

@@ -7,8 +7,12 @@ services:
       MYSQL_DATABASE: tournament_db
       MYSQL_USER: ${TOURNAMENT_DB_USER:?à définir dans .env}
       MYSQL_PASSWORD: ${TOURNAMENT_DB_PASSWORD:?à définir dans .env}
+      # Lus par k8s/mysql/initdb/user-db.sh, qui crée user_db et son compte.
+      USER_DB_USER: ${USER_DB_USER:?à définir dans .env}
+      USER_DB_PASSWORD: ${USER_DB_PASSWORD:?à définir dans .env}
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./k8s/mysql/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p$${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
@@ -22,6 +26,7 @@ services:
       DB_USER: ${TOURNAMENT_DB_USER}
       DB_PASSWORD: ${TOURNAMENT_DB_PASSWORD}
       DB_NAME: tournament_db
+      JWT_SECRET: ${JWT_SECRET:?à définir dans .env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -33,13 +38,30 @@ services:
       timeout: 5s
       retries: 10
 
+  user-service:
+    build: services/user-service
+    environment:
+      DB_HOST: mysql
+      DB_USER: ${USER_DB_USER}
+      DB_PASSWORD: ${USER_DB_PASSWORD}
+      DB_NAME: user_db
+      JWT_SECRET: ${JWT_SECRET:?à définir dans .env}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8002:8000"
+
   frontend:
     build: services/frontend
     environment:
       TOURNAMENT_API_URL: http://tournament-service:8000
+      USER_API_URL: http://user-service:8000
     depends_on:
       tournament-service:
         condition: service_healthy
+      user-service:
+        condition: service_started
     ports:
       - "8080:8000"
 

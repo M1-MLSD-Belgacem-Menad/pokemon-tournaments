@@ -1,0 +1,59 @@
+# Le Secret "app-secrets" n'est pas dans le dépôt : il se crée à la main depuis .env (voir le README).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # le volume ReadWriteOnce ne peut pas être monté par deux pods à la fois
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: MYSQL_ROOT_PASSWORD }
+            # Crée tournament_db et un compte qui n'a de droits que sur elle (comme dans Compose).
+            - name: MYSQL_DATABASE
+              value: tournament_db
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: TOURNAMENT_DB_USER }
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: TOURNAMENT_DB_PASSWORD }
+            # Lus par initdb/user-db.sh, qui crée user_db et son compte.
+            - name: USER_DB_USER
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: USER_DB_USER }
+            - name: USER_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: USER_DB_PASSWORD }
+          ports:
+            - containerPort: 3306
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "MYSQL_PWD=\"$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -uroot"]
+            periodSeconds: 5
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: initdb
+          configMap:
+            name: mysql-initdb
+        - name: data
+          persistentVolumeClaim:
+            claimName: mysql-data

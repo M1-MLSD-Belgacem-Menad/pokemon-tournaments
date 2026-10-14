@@ -24,44 +24,51 @@ def get(path, **params):
     return resp.json()
 
 
-def parse_standings(standings, top=16):
-    """JSON brut de /standings -> top N trié. Les joueurs sans classement (abandons) sont ignorés."""
-    ranked = sorted(
-        (s for s in standings if s.get("placing")), key=lambda s: s["placing"]
+def clean(value):
+    """Texte sans espaces autour, ou None s'il est vide."""
+    return value.strip() or None if isinstance(value, str) else None
+
+
+def parse_standings(standings):
+    """JSON brut de /standings -> tous les joueurs, classés d'abord, puis les abandons (sans place).
+
+    Tous et pas seulement le top 16 : sinon les winrates ne viendraient que de joueurs qui ont gagné.
+    """
+    ordered = sorted(
+        standings, key=lambda s: (not s.get("placing"), s.get("placing") or 0)
     )
     return [
         {
             "player": s["player"],
-            "placement": s["placing"],
-            "wins": s["record"]["wins"],
-            "losses": s["record"]["losses"],
-            "ties": s["record"]["ties"],
+            "placement": s.get("placing") or None,  # absente, null ou 0 : abandon
+            **{k: (s.get("record") or {}).get(k) for k in ("wins", "losses", "ties")},
             "team": [
                 {
                     "name": p["name"],
-                    "item": p.get("item"),
-                    "ability": p.get("ability"),
-                    "nature": p.get("nature"),
-                    "tera": p.get("tera"),
-                    "moves": p.get("attacks", []),
+                    "item": clean(p.get("item")),
+                    "ability": clean(p.get("ability")),
+                    "nature": clean(p.get("nature")),
+                    "tera": clean(p.get("tera")),
+                    # Les champs vides ou null de Limitless ne font pas rejeter tout le tournoi.
+                    "moves": [
+                        m.strip() for m in p.get("attacks") or [] if m and m.strip()
+                    ],
                 }
                 for p in s.get("decklist") or []
             ],
         }
-        for s in ranked[:top]
+        for s in ordered
     ]
 
 
-def parse_pairings(pairings, keep):
-    """JSON brut de /pairings -> matchs où joue au moins un joueur de `keep`.
+def parse_pairings(pairings):
+    """JSON brut de /pairings -> tous les matchs du tournoi.
 
     Limitless : player2 absent = bye (ou forfait), winner 0 = nul, -1 = double défaite.
     """
     matches = []
     for m in pairings:
         player2 = m.get("player2") or None
-        if m["player1"] not in keep and player2 not in keep:
-            continue
         matches.append(
             {
                 "phase": m["phase"],
@@ -76,9 +83,9 @@ def parse_pairings(pairings, keep):
 
 def build_payload(tournament_id, details, standings, pairings):
     """Assemble le JSON attendu par POST /internal/import du tournament-service."""
-    top = parse_standings(standings)
-    matches = parse_pairings(pairings, {s["player"] for s in top})
-    needed = {s["player"] for s in top} | {
+    ranked = parse_standings(standings)
+    matches = parse_pairings(pairings)
+    needed = {s["player"] for s in ranked} | {
         p for m in matches for p in (m["player1"], m["player2"]) if p
     }
     by_id = {s["player"]: s for s in standings}
@@ -97,7 +104,7 @@ def build_payload(tournament_id, details, standings, pairings):
             }
             for pid in sorted(needed)
         ],
-        "standings": top,
+        "standings": ranked,
         "matches": matches,
     }
 
@@ -109,7 +116,9 @@ def scrape(tournament_id, api_url):
         get(f"/tournaments/{tournament_id}/standings"),
         get(f"/tournaments/{tournament_id}/pairings"),
     )
-    resp = requests.post(f"{api_url}/internal/import", json=payload, timeout=30)
+    resp = requests.post(
+        f"{api_url}/internal/import", json=payload, timeout=120
+    )  # gros tournois
     resp.raise_for_status()
     status = "importé" if resp.status_code == 201 else "déjà en base"
     print(f"{payload['name']} ({tournament_id}) : {status}", flush=True)
