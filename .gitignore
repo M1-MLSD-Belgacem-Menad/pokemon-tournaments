@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Secrets et configuration locale
+.env
+
+# IDE et OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
