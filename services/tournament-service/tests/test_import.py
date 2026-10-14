@@ -24,7 +24,13 @@ def make_payload():
             "losses": i // 2,
             "ties": 0,
             "team": [
-                {"name": n, "item": "Sitrus Berry", "moves": ["Protect"]}
+                {
+                    "name": n,
+                    "item": "Sitrus Berry",
+                    "ability": "Intimidate",
+                    "moves": ["Protect", "Fake Out"],
+                    "nature": "Adamant",  # ignorée
+                }
                 for n in SPECIES
             ],
         }
@@ -66,6 +72,8 @@ def test_import_nominal(client, db):
     assert count(db, "team_pokemon") == 16 * 6
     assert count(db, "pokemon") == 6
     assert count(db, "player") == 17
+    assert count(db, "team_pokemon_move") == 16 * 6 * 2
+    assert (count(db, "move"), count(db, "item"), count(db, "ability")) == (2, 1, 1)
     with db.cursor() as cur:
         cur.execute(
             "SELECT p1.source_id AS a, p2.source_id AS b, w.source_id AS w FROM game_match m"
@@ -106,6 +114,10 @@ def test_players_and_pokemon_are_shared_between_tournaments(client, db):
         lambda p: p["matches"][0].update(player2="inconnu"),
         lambda p: p["matches"][0].update(winner="p5"),  # n'a pas joué ce match
         lambda p: p["standings"][0]["team"].append({"name": "Pikachu"}),  # 7 Pokémon
+        lambda p: p["standings"][0]["team"][0].update(
+            moves=["A", "B", "C", "D", "E"]
+        ),  # 5 attaques
+        lambda p: p["standings"][0]["team"][0].update(moves=[" "]),  # attaque vide
         lambda p: p.update(date="pas une date"),
         lambda p: p.update(source_url="javascript:alert(1)"),
         lambda p: p["standings"][1].update(player="p1"),  # un joueur classé deux fois

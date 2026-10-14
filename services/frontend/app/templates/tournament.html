@@ -14,7 +14,15 @@
       <td>{{ s.placement }}</td>
       <td>{{ s.player }}{% if s.country %} <span class="country">{{ s.country }}</span>{% endif %}</td>
       <td>{% if s.wins is not none %}{{ s.wins }}-{{ s.losses }}{% if s.ties %}-{{ s.ties }}{% endif %}{% endif %}</td>
-      <td class="team">{% for p in s.team %}<span class="mon">{{ p }}</span>{% endfor %}</td>
+      <td class="team">
+      {% for p in s.team %}
+        <div class="mon">
+          <strong>{{ p.name }}</strong>{% if p.item %} <span class="item">@ {{ p.item }}</span>{% endif %}
+          {% if p.ability %}<div class="ability">{{ p.ability }}</div>{% endif %}
+          {% if p.moves %}<ul class="moves">{% for m in p.moves %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      {% endfor %}
+      </td>
     </tr>
   {% endfor %}
   </tbody>

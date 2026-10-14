@@ -20,7 +20,11 @@ from app.main import app
 
 TABLES = [
     "game_match",
+    "team_pokemon_move",
     "team_pokemon",
+    "move",
+    "item",
+    "ability",
     "standing",
     "tournament",
     "player",

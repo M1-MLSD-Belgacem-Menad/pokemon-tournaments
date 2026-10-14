@@ -30,12 +30,13 @@ TOURNAMENT = {
             "losses": 0,
             "ties": 0,
             "team": [
-                "Staraptor",
-                "Farigiraf",
-                "Indeedee ♀",
-                "Basculegion",
-                "Kingambit",
-                "Raichu",
+                {
+                    "name": "Staraptor",
+                    "item": "Staraptite",
+                    "ability": "Intimidate",
+                    "moves": ["Brave Bird", "Close Combat", "Tailwind", "Protect"],
+                },
+                {"name": "Indeedee ♀", "item": None, "ability": None, "moves": []},
             ],
         }
     ],
@@ -96,6 +97,11 @@ def test_detail_affiche_le_classement_et_l_equipe(api):
     assert "KimPkm" in resp.text
     assert "10-0" in resp.text
     assert "Indeedee ♀" in resp.text
+    assert (
+        "@ Staraptite" in resp.text
+        and "Intimidate" in resp.text
+        and "Tailwind" in resp.text
+    )
 
 
 def test_tournoi_inconnu_renvoie_404(api):
