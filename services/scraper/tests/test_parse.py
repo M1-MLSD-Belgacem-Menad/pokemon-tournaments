@@ -16,9 +16,12 @@ DETAILS = {
 }
 
 
-def test_top16_trie_avec_equipes_completes():
+def test_tous_les_joueurs_classes_puis_abandons():
     top = parse_standings(STANDINGS)
-    assert [s["placement"] for s in top] == list(range(1, 17))
+    assert len(top) == 92
+    # 30 joueurs classés, puis 62 abandons sans place.
+    assert [s["placement"] for s in top] == list(range(1, 31)) + [None] * 62
+    assert top[-1]["wins"] is not None and len(top[-1]["team"]) == 6
     assert top[0]["player"] == "kimpkm"
     assert top[0]["wins"] == 10
     assert all(len(s["team"]) == 6 for s in top)
@@ -32,12 +35,14 @@ def test_top16_trie_avec_equipes_completes():
     }
 
 
-def test_limite_top():
-    assert len(parse_standings(STANDINGS, top=2)) == 2
+def test_sans_bilan():
+    s = parse_standings([{"player": "x", "placing": 1}])[0]
+    assert (s["wins"], s["team"]) == (None, [])
+    assert parse_standings([{"player": "x", "placing": 0}])[0]["placement"] is None
 
 
 def test_bye_et_double_defaite():
-    matches = parse_pairings(PAIRINGS, {"robertozs01", "leon0124"})
+    matches = parse_pairings(PAIRINGS)
     bye = next(m for m in matches if m["round"] == 1 and m["player1"] == "robertozs01")
     assert bye == {
         "phase": 1,
@@ -53,19 +58,16 @@ def test_bye_et_double_defaite():
     assert double_loss["winner"] is None
 
 
-def test_ne_garde_que_les_matchs_du_top16():
-    top_ids = {s["player"] for s in parse_standings(STANDINGS)}
-    matches = parse_pairings(PAIRINGS, top_ids)
-    assert matches
-    assert all(m["player1"] in top_ids or m["player2"] in top_ids for m in matches)
-    assert len(matches) < len(PAIRINGS)
+def test_tous_les_matchs():
+    matches = parse_pairings(PAIRINGS)
+    assert len(matches) == len(PAIRINGS)
     assert any(m["phase"] == 2 for m in matches)  # le top cut est inclus
 
 
 def test_payload_coherent():
     payload = build_payload("6ac55ac385920e4d2536589f", DETAILS, STANDINGS, PAIRINGS)
     assert payload["date"] == "2026-10-13"
-    assert len(payload["standings"]) == 16
+    assert len(payload["standings"]) == 92
     known = {p["source_id"] for p in payload["players"]}
     referenced = {s["player"] for s in payload["standings"]} | {
         p
@@ -74,13 +76,11 @@ def test_payload_coherent():
         if p
     }
     assert referenced <= known
-    # Un joueur hors top 16 n'est envoyé que s'il a joué contre le top 16.
-    assert len(known) < len(STANDINGS)
 
 
 def test_nul():
     tie = [{"phase": 1, "round": 1, "player1": "a", "player2": "b", "winner": 0}]
-    assert parse_pairings(tie, {"a"})[0]["winner"] is None
+    assert parse_pairings(tie)[0]["winner"] is None
 
 
 def test_adversaire_absent_des_standings():
@@ -103,3 +103,14 @@ def test_tournoi_trop_recent_ignore():
     now = datetime.datetime(2026, 10, 14, 18, tzinfo=datetime.UTC)
     assert is_over({"date": "2026-10-13T12:00:00.000Z"}, now)
     assert not is_over({"date": "2026-10-14T12:00:00.000Z"}, now)
+
+
+def test_champs_vides_ou_null_nettoyes():
+    deck = [{"name": "Pikachu", "item": " ", "ability": None, "attacks": None}]
+    team = parse_standings([{"player": "x", "placing": 1, "decklist": deck}])[0]["team"]
+    assert team[0]["item"] is None and team[0]["moves"] == []
+    deck = [
+        {"name": "Pikachu", "item": "Light Ball ", "attacks": ["", " Protect", None]}
+    ]
+    team = parse_standings([{"player": "x", "placing": 1, "decklist": deck}])[0]["team"]
+    assert team[0]["item"] == "Light Ball" and team[0]["moves"] == ["Protect"]

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Saisir un tournoi{% endblock %}
+{% block content %}
+<h1>Saisir un tournoi local</h1>
+<form method="post" action="/tournaments/new">
+  <div class="stack">
+    <label>Nom <input name="name" value="{{ form.name or '' }}" required maxlength="200"></label>
+    <label>Date <input name="date" type="date" value="{{ form.date or '' }}" required></label>
+    <label>Format <input name="format" value="{{ form.format or '' }}" required maxlength="50" placeholder="ex. M-C"></label>
+    <label>Nombre de participants (facultatif) <input name="player_count" type="number" min="1" value="{{ form.player_count or '' }}"></label>
+    <fieldset>
+      <legend>Niveau de détail</legend>
+      <label><input type="radio" name="detail_level" value="winner" {% if form.detail_level == "winner" %}checked{% endif %} required> Vainqueur seul (ligne 1 uniquement)</label>
+      <label><input type="radio" name="detail_level" value="top16" {% if form.detail_level != "winner" %}checked{% endif %}> Classement jusqu'au top 16 (lignes remplies dans l'ordre)</label>
+    </fieldset>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>Joueur</th><th>Équipe (jusqu'à {{ size }} Pokémon)</th></tr></thead>
+    <tbody>
+    {% for i in range(1, rows + 1) %}
+      <tr>
+        <td>{{ i }}</td>
+        <td><input name="player_{{ i }}" value="{{ form['player_%d' % i] or '' }}" maxlength="100" aria-label="Joueur {{ i }}"></td>
+        <td class="team">
+        {% for j in range(1, size + 1) %}
+          <input name="mon_{{ i }}_{{ j }}" value="{{ form['mon_%d_%d' % (i, j)] or '' }}" maxlength="100" size="10" aria-label="Pokémon {{ j }} du joueur {{ i }}">
+        {% endfor %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p><button>Enregistrer le tournoi</button></p>
+</form>
+{% endblock %}

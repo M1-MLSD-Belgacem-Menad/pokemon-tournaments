@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+spec:
+  replicas: 2  # sans état ; les migrations au démarrage sont protégées par un verrou MySQL
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      # Attend que MySQL soit prêt, comme le tournament-service.
+      initContainers:
+        - name: wait-mysql
+          image: pokemon-user
+          command:
+            - .venv/bin/python
+            - -c
+            - |
+              import socket, time
+              while True:
+                  try:
+                      socket.create_connection(("mysql", 3306), timeout=2).close()
+                      break
+                  except OSError:
+                      time.sleep(2)
+      containers:
+        - name: user-service
+          image: pokemon-user  # compte et version : k8s/kustomization.yaml
+          env:
+            - name: DB_HOST
+              value: mysql
+            - name: DB_NAME
+              value: user_db
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: USER_DB_USER }
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: USER_DB_PASSWORD }
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef: { name: app-secrets, key: JWT_SECRET }
+          ports:
+            - containerPort: 8000
+          startupProbe:
+            httpGet: { path: /health, port: 8000 }
+            periodSeconds: 5
+            failureThreshold: 36  # 3 minutes
+          readinessProbe:
+            httpGet: { path: /health, port: 8000 }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            periodSeconds: 10
