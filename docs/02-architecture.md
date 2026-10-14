@@ -232,10 +232,10 @@ pokemon-tournaments/
 ├── README.md
 ├── docs/                      ce dossier
 ├── services/
-│   ├── tournament-service/    app/, tests/, Dockerfile, requirements.txt
-│   ├── user-service/          app/, tests/, Dockerfile, requirements.txt
-│   ├── scraper/               scraper/, tests/fixtures/, Dockerfile, requirements.txt
-│   └── frontend/              app/, templates/, static/, Dockerfile, requirements.txt
+│   ├── tournament-service/    app/, tests/, Dockerfile, pyproject.toml, uv.lock
+│   ├── user-service/          app/, tests/, Dockerfile, pyproject.toml, uv.lock
+│   ├── scraper/               scraper/, tests/fixtures/, Dockerfile, pyproject.toml, uv.lock
+│   └── frontend/              app/, templates/, static/, Dockerfile, pyproject.toml, uv.lock
 ├── db/migrations/
 │   ├── tournament/            001_init.sql, 002_types.sql…
 │   └── user/                  001_init.sql

@@ -4,6 +4,7 @@ Source : API JSON publique, sans clé (https://docs.limitlesstcg.com/developer).
 Usage : python scraper.py              -> dernier tournoi VGC
         python scraper.py <tournoi_id> -> tournoi précis
 """
+
 import json
 import sys
 import time
