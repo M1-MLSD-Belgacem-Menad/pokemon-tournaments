@@ -1,0 +1,26 @@
+# Scraping quotidien. Lancement à la main : kubectl -n pokemon create job --from=cronjob/scraper test
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: scraper
+spec:
+  schedule: "0 6 * * *"
+  timeZone: Europe/Paris
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0  # pas de relance : un tournoi en erreur le restera, le passage du lendemain suffit
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: scraper
+              image: pokemon-scraper  # compte et version : k8s/kustomization.yaml
+              env:
+                # Appel par le nom DNS interne du Service, sans passer par l'Ingress.
+                - name: TOURNAMENT_API_URL
+                  value: http://tournament-service:8000
+                # Assez large pour couvrir une journée de tournois : ceux commencés depuis moins de 24 h
+                # sont ignorés et repris le lendemain, ceux déjà en base sont ignorés par l'import.
+                - name: SCRAPE_LIMIT
+                  value: "30"
