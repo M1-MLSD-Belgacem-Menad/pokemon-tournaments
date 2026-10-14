@@ -21,7 +21,7 @@
             │ Pokémon, stats      │  F-01, F-04, F-05, F-06
             └───────▲──────┬──────┘
                     │      │ SQL
-     POST /internal │  ┌───▼──────────────────────┐
+     gRPC Import    │  ┌───▼──────────────────────┐
    ┌────────────────┴┐ │ MySQL                    │  T-08, T-14
    │ scraper         │ │  schéma tournament_db    │
    │ (CronJob K8s)   │ │  schéma user_db          │
@@ -34,7 +34,7 @@
 |---|---|---|
 | `tournament-service` | API REST des tournois, classements, équipes, Pokémon, formats et statistiques. Seul propriétaire du schéma `tournament_db`. | T-01, F-01, F-02, F-04, F-05, F-06, E-03 |
 | `user-service` | Inscription, connexion, émission de jetons JWT. Seul propriétaire du schéma `user_db`. | T-07, F-03, E-03 |
-| `scraper` | Tâche batch qui récupère les résultats sur les sites sources et les envoie au `tournament-service` via son API. Ne touche jamais la base directement. | T-17, E-02, E-03 |
+| `scraper` | Tâche batch qui récupère les résultats sur les sites sources et les envoie au `tournament-service` par gRPC (enrichissement PokéAPI en REST). Ne touche jamais la base directement. | T-17, E-02, E-03 |
 | `frontend` | Pages web. N'appelle que les API, sans logique métier. | E-01, B-01 (présentation) |
 | Gateway | Point d'entrée unique, routage par préfixe d'URL. | T-06, E-04 |
 | MySQL | Persistance, un schéma par service. | T-08, T-14 |
