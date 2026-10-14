@@ -141,7 +141,7 @@ Une migration et une PR chacune, dans l'ordre de F-02, en s'arrêtant quand le t
 
 ## Étape 10 : créateur d'équipes et statistiques (S6–S7, jusqu'au 1er déc.)
 
-- Migration 009 ; `GET /api/formats/{id}/legal-pokemon` (décision 6).
+- Migration 009 (équipes sauvegardées) ; `GET /api/formats/{code}/legal-pokemon` calculé depuis les tournois scrapés (décision 6).
 - `GET /api/stats/pokemon`, `/combinations` (paires d'une même équipe), `/matchups` (matchs dont les deux équipes sont connues : tous les joueurs sont enregistrés depuis la migration 002).
 - `POST /api/teams` (jeton requis, Pokémon légaux seulement, contrôle côté API).
 - Frontend : écran de construction (6 Pokémon max) qui affiche les winrates des Pokémon et des paires choisis.

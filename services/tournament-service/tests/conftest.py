@@ -19,6 +19,8 @@ from app.db import connect
 from app.main import app
 
 TABLES = [
+    "saved_team_pokemon",
+    "saved_team",
     "game_match",
     "team_pokemon_move",
     "team_pokemon",

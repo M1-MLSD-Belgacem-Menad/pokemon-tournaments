@@ -4,9 +4,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Annotated
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -40,14 +40,22 @@ async def same_origin_posts(request: Request, call_next):
 ROWS, TEAM_SIZE = 16, 6  # lignes et Pokémon par ligne du formulaire de saisie
 
 
-def api_get(path: str):
+def api_get(path: str, token: str | None = None):
     """GET JSON sur le tournament-service. Le frontend n'a pas de logique métier : il affiche l'API."""
+    url = f"{API_URL}{path}"
+    req = (
+        urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+        if token
+        else url
+    )
     try:
-        with urllib.request.urlopen(f"{API_URL}{path}", timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:
             return json.load(resp)
     except urllib.error.HTTPError as e:
-        if e.code == 404:
-            raise HTTPException(404, "introuvable") from e
+        if e.code in (401, 404):
+            raise HTTPException(
+                e.code, "introuvable" if e.code == 404 else "session expirée"
+            ) from e
         raise HTTPException(502, "erreur du service des tournois") from e
     except (urllib.error.URLError, TimeoutError) as e:
         raise HTTPException(503, "service des tournois injoignable") from e
@@ -184,6 +192,78 @@ def tournament(request: Request, tournament_id: int):
         request,
         "tournament.html",
         {"t": api_get(f"/api/tournaments/{tournament_id}?top=16")},
+    )
+
+
+def builder_page(request: Request, fmt: str | None, chosen: list[str], **extra):
+    """Créateur d'équipe : Pokémon légaux du format, puis winrates des Pokémon et des paires choisis."""
+    formats = api_get("/api/formats")
+    fmt = fmt or (
+        formats[0]["code"] if formats else None
+    )  # par défaut : le format courant
+    ctx = {
+        "formats": formats,
+        "format": fmt,
+        "chosen": [],
+        "size": TEAM_SIZE,
+        "teams": None,
+    }
+    if fmt:
+        ctx["legal"] = api_get(f"/api/formats/{quote(fmt, safe='')}/legal-pokemon")
+        # Sans doublon ni case vide, et légaux dans ce format (il a pu changer depuis le choix).
+        legal = set(ctx["legal"])
+        chosen = list(dict.fromkeys(p for p in chosen if p in legal))[:TEAM_SIZE]
+        ctx["chosen"] = chosen
+        q = urlencode({"format": fmt, "pokemon": chosen}, doseq=True)
+        if chosen:
+            ctx["stats"] = api_get(f"/api/stats/pokemon?{q}")
+            ctx["pairs"] = api_get(f"/api/stats/combinations?{q}")
+            ctx["matchups"] = {
+                p: api_get(
+                    f"/api/stats/matchups?{urlencode({'format': fmt, 'pokemon': p, 'limit': 5})}"
+                )
+                for p in chosen
+            }
+    if token := request.cookies.get("token"):
+        try:
+            ctx["teams"] = api_get("/api/teams", token)
+            for t in ctx["teams"]:
+                t["query"] = urlencode(
+                    {"format": t["format"], "p": t["pokemon"]}, doseq=True
+                )
+        except HTTPException:  # jeton expiré : la page s'affiche quand même
+            pass
+    status_code = extra.pop("status_code", 200)
+    return templates.TemplateResponse(
+        request, "builder.html", ctx | extra, status_code=status_code
+    )
+
+
+@app.get("/builder", response_class=HTMLResponse)
+def builder(
+    request: Request,
+    format: str | None = None,
+    p: Annotated[list[str], Query()] = [],  # noqa: B006 (FastAPI copie la valeur par défaut)
+    saved: bool = False,
+):
+    return builder_page(request, format, p, saved=saved)
+
+
+@app.post("/builder/save", response_class=HTMLResponse)
+async def save_team(request: Request):
+    token = request.cookies.get("token")
+    if not token:
+        return RedirectResponse("/login", status_code=303)
+    form = await request.form()
+    fmt, chosen = form.get("format", ""), [p for p in form.getlist("p") if p]
+    team = {"name": form.get("name", ""), "format": fmt, "pokemon": chosen}
+    code, body = await run_in_threadpool(api_post, f"{API_URL}/api/teams", team, token)
+    if code == 201:
+        q = urlencode({"format": fmt, "p": chosen, "saved": 1}, doseq=True)
+        return RedirectResponse(f"/builder?{q}", status_code=303)
+    error = "Session expirée : reconnecte-toi." if code == 401 else error_message(body)
+    return await run_in_threadpool(
+        builder_page, request, fmt, chosen, error=error, status_code=code
     )
 
 

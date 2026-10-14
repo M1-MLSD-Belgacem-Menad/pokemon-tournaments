@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Créer une équipe{% endblock %}
+{% macro pct(r) %}{% if r.winrate is not none %}{{ "%.1f" | format(r.winrate * 100) }} %{% else %}-{% endif %}{% endmacro %}
+{% block content %}
+<h1>Créer une équipe</h1>
+{% if not formats %}
+<p>Aucun tournoi en base : lancer le scraper d'abord.</p>
+{% else %}
+{% if saved %}<p class="ok" role="status">Équipe enregistrée.</p>{% endif %}
+<form method="get" action="/builder">
+  <div class="stack">
+    <label>Format
+      <select name="format">
+      {% for f in formats %}<option value="{{ f.code }}"{% if f.code == format %} selected{% endif %}>{{ f.code }} ({{ f.tournaments }} tournois)</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+  <p class="meta">{{ legal | length }} Pokémon légaux : ceux joués dans les tournois scrapés de ce format.</p>
+  <div class="team">
+  {% for i in range(size) %}
+    <select name="p" aria-label="Pokémon {{ i + 1 }}">
+      <option value="">-</option>
+      {% for name in legal %}<option{% if chosen[i] == name %} selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select>
+  {% endfor %}
+  </div>
+  <p><button>Voir les statistiques</button></p>
+</form>
+
+{% if stats is defined %}
+<h2>Winrate de chaque Pokémon</h2>
+<table>
+  <thead><tr><th>Pokémon</th><th>Équipes</th><th>Bilan</th><th>Winrate</th><th>Matchups les plus fréquents</th></tr></thead>
+  <tbody>
+  {% for r in stats %}
+    <tr>
+      <td>{{ r.pokemon }}</td><td>{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td><td>{{ pct(r) }}</td>
+      <td>{% for m in matchups[r.pokemon] %}{{ m.opponent }} {{ pct(m) }} ({{ m.games }}){% if not loop.last %}, {% endif %}{% endfor %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<h2>Winrate des paires choisies</h2>
+{% if pairs %}
+<table>
+  <thead><tr><th>Paire</th><th>Équipes</th><th>Bilan</th><th>Winrate</th></tr></thead>
+  <tbody>
+  {% for r in pairs %}
+    <tr><td>{{ r.pokemon1 }} + {{ r.pokemon2 }}</td><td>{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td><td>{{ pct(r) }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="meta">Aucune équipe n'a joué ces Pokémon ensemble.</p>{% endif %}
+<p class="meta">Winrate = victoires / (victoires + défaites) des joueurs de tous les tournois scrapés du format. Matchups : matchs dont les deux équipes sont connues.</p>
+
+{% if teams is not none %}
+<form method="post" action="/builder/save" class="stack">
+  <input type="hidden" name="format" value="{{ format }}">
+  {% for p in chosen %}<input type="hidden" name="p" value="{{ p }}">{% endfor %}
+  <label>Nom de l'équipe <input name="name" required maxlength="100"></label>
+  <button>Enregistrer cette équipe</button>
+</form>
+{% else %}
+<p><a href="/login">Se connecter</a> pour enregistrer l'équipe.</p>
+{% endif %}
+{% endif %}
+
+{% if teams %}
+<h2>Mes équipes</h2>
+<ul>
+{% for t in teams %}
+  <li><a href="/builder?{{ t.query }}">{{ t.name }}</a> ({{ t.format }}) : {{ t.pokemon | join(", ") }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+{% endif %}
+{% endblock %}

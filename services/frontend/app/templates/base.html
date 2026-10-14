@@ -10,6 +10,7 @@
   <header>
     <a href="/">Tournois Pokémon VGC</a>
     <nav>
+      <a href="/builder">Créer une équipe</a>
     {% if request.cookies.token %}
       <a href="/tournaments/new">Saisir un tournoi</a>
       <form method="post" action="/logout"><button>Déconnexion</button></form>
