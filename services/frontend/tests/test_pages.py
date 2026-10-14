@@ -143,10 +143,13 @@ def sent(monkeypatch):
     return sent
 
 
-def test_connexion_pose_un_cookie_httponly(sent):
+@pytest.mark.parametrize("proto, secure", [(None, False), ("https", True)])
+def test_connexion_pose_un_cookie_httponly(sent, proto, secure):
+    headers = {"X-Forwarded-Proto": proto} if proto else {}
     resp = client.post(
         "/login",
         data={"username": "sacha", "password": "pikachu123"},
+        headers=headers,
         follow_redirects=False,
     )
     assert resp.status_code == 303
@@ -156,6 +159,15 @@ def test_connexion_pose_un_cookie_httponly(sent):
         and "HttpOnly" in cookie
         and "samesite=lax" in cookie.lower()
     )
+    assert ("Secure" in cookie) == secure  # Secure seulement derrière l'Ingress HTTPS
+
+
+def test_deconnexion_efface_le_cookie_secure():
+    resp = client.post(
+        "/logout", headers={"X-Forwarded-Proto": "https"}, follow_redirects=False
+    )
+    cookie = resp.headers["set-cookie"]
+    assert 'token=""' in cookie and "Max-Age=0" in cookie and "Secure" in cookie
 
 
 def test_mauvais_mot_de_passe_affiche_l_erreur(monkeypatch):
@@ -172,9 +184,11 @@ def test_inscription_puis_connexion(sent):
     resp = client.post(
         "/register",
         data={"username": "sacha", "email": "s@x.fr", "password": "pikachu123"},
+        headers={"X-Forwarded-Proto": "https"},
         follow_redirects=False,
     )
     assert resp.status_code == 303
+    assert "Secure" in resp.headers["set-cookie"]
     assert [url for url, _, _ in sent] == [
         "http://users/api/auth/register",
         "http://users/api/auth/login",

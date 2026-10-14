@@ -15,9 +15,16 @@ spec:
       labels:
         app: mysql
     spec:
+      serviceAccountName: mysql
+      automountServiceAccountToken: false
+      # Pas de runAsNonRoot : l'image démarre en root puis passe sur l'utilisateur mysql.
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: mysql
           image: mysql:8.4
+          securityContext:
+            allowPrivilegeEscalation: false  # le passage root -> mysql n'en a pas besoin
           env:
             - name: MYSQL_ROOT_PASSWORD
               valueFrom:
