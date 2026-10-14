@@ -2,7 +2,7 @@
 
 Application web autour des résultats de tournois Pokémon : recensement des tournois par scraping, espace utilisateur pour saisir des tournois locaux, et créateur d'équipes avec statistiques de winrate. Projet de M1 (cours de programmation distribuée), réalisé en deux mois.
 
-> **Statut** : étape 1 du [plan par étapes](docs/06-plan-par-etapes.md) en cours. Seul le socle existe (`tournament-service` qui répond sur `/health`, MySQL dans Docker Compose, CI). Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](docs/02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
+> **Statut** : étape 2 du [plan par étapes](docs/06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (`/health`, import `POST /internal/import` dans MySQL), Docker Compose, CI. Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](docs/02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
 
 ## Documentation
 
@@ -73,6 +73,8 @@ Lancer un scraping à la main :
 docker compose run --rm scraper
 ```
 
+Si la base a été créée avant l'étape 2 (sans `tournament_db`), repartir d'une base vide une fois avec `docker compose down -v`.
+
 Arrêter, et supprimer les données avec `-v` :
 
 ```bash
@@ -104,10 +106,15 @@ Puis ouvrir l'adresse donnée par `minikube ip` (ou utiliser `minikube tunnel` s
 
 ## Tests
 
+Les tests du `tournament-service` utilisent une base MySQL jetable sur le port 3307 :
+
 ```bash
+docker run --rm -d -p 3307:3306 -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=tournament_test --name mysql-test mysql:8.4
+until docker exec mysql-test mysql -uroot -ptest -e "SELECT 1" tournament_test >/dev/null 2>&1; do sleep 2; done
 cd services/tournament-service
 uv sync
 uv run pytest
+docker stop mysql-test
 ```
 
 ## Décisions de cadrage (14 octobre 2026)
