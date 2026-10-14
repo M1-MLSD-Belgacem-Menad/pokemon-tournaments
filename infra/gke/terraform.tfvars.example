@@ -1,0 +1,2 @@
+# Copier en terraform.tfvars (non versionné) et mettre l'identifiant de son projet.
+project_id = "mon-projet-123456"

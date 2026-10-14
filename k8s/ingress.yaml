@@ -1,4 +1,4 @@
-# Gateway : seule entrée du cluster (minikube addons enable ingress).
+# Gateway : seule entrée du cluster (ingress-nginx : minikube addons enable ingress, ou son manifeste « cloud » sur GKE).
 # /internal/ n'a pas de règle (seul le scraper, dans le cluster, l'appelle) : il tombe sur le frontend, qui répond 404.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
