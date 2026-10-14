@@ -6,8 +6,13 @@ metadata:
   name: gateway
 spec:
   ingressClassName: nginx
+  # HTTPS avec un certificat auto-signé (création du Secret : README). nginx redirige le HTTP vers le HTTPS.
+  tls:
+    - hosts: [pokemon.local]
+      secretName: pokemon-tls
   rules:
-    - http:
+    - host: pokemon.local
+      http:
         paths:
           - path: /api/auth
             pathType: Prefix

@@ -12,10 +12,19 @@ spec:
       labels:
         app: user-service
     spec:
+      serviceAccountName: user-service
+      automountServiceAccountToken: false  # aucun service n'appelle l'API Kubernetes
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534  # nobody, comme le USER des Dockerfiles
+        seccompProfile: { type: RuntimeDefault }
       # Attend que MySQL soit prêt, comme le tournament-service.
       initContainers:
         - name: wait-mysql
           image: pokemon-user
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
           command:
             - .venv/bin/python
             - -c
@@ -30,6 +39,9 @@ spec:
       containers:
         - name: user-service
           image: pokemon-user  # compte et version : k8s/kustomization.yaml
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
           env:
             - name: DB_HOST
               value: mysql

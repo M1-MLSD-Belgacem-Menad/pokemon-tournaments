@@ -12,9 +12,18 @@ spec:
       labels:
         app: frontend
     spec:
+      serviceAccountName: frontend
+      automountServiceAccountToken: false  # aucun service n'appelle l'API Kubernetes
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534  # nobody, comme le USER des Dockerfiles
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: frontend
           image: pokemon-frontend  # compte et version : k8s/kustomization.yaml
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
           env:
             - name: TOURNAMENT_API_URL
               value: http://tournament-service:8000

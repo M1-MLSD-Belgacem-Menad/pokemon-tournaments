@@ -1,0 +1,31 @@
+# Un compte par service, sans Role ni RoleBinding : aucun service n'appelle l'API Kubernetes,
+# donc le droit minimal est aucun droit. Vérification : voir « Sécurité » dans le README.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mysql
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tournament-service
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: user-service
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: frontend
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: scraper
+automountServiceAccountToken: false
