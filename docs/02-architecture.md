@@ -57,7 +57,7 @@ Préfixes routés par la gateway. Les routes en écriture exigent un jeton.
 | GET | `/api/tournaments` | tournament | Liste (filtres : format, date, source) |
 | GET | `/api/tournaments/{id}` | tournament | Détail + classement + équipes |
 | POST | `/api/tournaments` | tournament | Saisie d'un tournoi local (F-04), jeton requis |
-| GET | `/api/pokemon` / `/api/pokemon/{id}` | tournament | Données Pokémon (enrichies selon l'étape) |
+| GET | `/api/pokemon?pokemon=…` | tournament | Types et statistiques de base (PokéAPI) des Pokémon demandés (6 au plus) |
 | GET | `/api/formats` | tournament | Formats joués, le plus récent (format courant) en premier |
 | GET | `/api/formats/{code}/legal-pokemon` | tournament | Pokémon légaux (F-05) : ceux joués dans les tournois scrapés du format |
 | GET | `/api/stats/pokemon` | tournament | Taux d'usage et winrate par Pokémon |
@@ -66,6 +66,7 @@ Préfixes routés par la gateway. Les routes en écriture exigent un jeton.
 | POST | `/api/teams` | tournament | Enregistrer une équipe construite (étape 3), jeton requis, Pokémon légaux seulement |
 | GET | `/api/teams` | tournament | Équipes de l'utilisateur du jeton |
 | POST | `/internal/import` | tournament | Import par le scraper, non exposé par la gateway |
+| GET / POST | `/internal/enrich/missing`, `/internal/enrich` | tournament | Noms à enrichir, puis données PokéAPI envoyées par le scraper, non exposés |
 | POST | `/api/auth/register` | user | Inscription |
 | POST | `/api/auth/login` | user | Connexion, renvoie un JWT |
 | GET | `/api/auth/me` | user | Profil courant |
@@ -184,7 +185,7 @@ CREATE TABLE app_user (
 
 ### Enrichissement des Pokémon
 
-Décision du 14/10 : source la plus simple. **[Reco]** Un petit script (commande du `scraper`) interroge l'API publique JSON PokéAPI pour les Pokémon présents en base et envoie types, talents et statistiques au `tournament-service`. Les attaques et objets réellement joués viennent des équipes scrapées. Les réponses sont mises en cache localement pour ne pas réinterroger l'API.
+Décision du 14/10 : source la plus simple. La commande `python scraper.py enrich`, aussi lancée à la fin de chaque scraping, demande au `tournament-service` les Pokémon sans statistiques et les attaques sans catégorie (`GET /internal/enrich/missing`), les cherche sur l'API publique PokéAPI, puis envoie types, statistiques de base et type, catégorie et puissance des attaques (`POST /internal/enrich`). Les talents, objets et attaques réellement joués viennent des équipes scrapées. La base sert de cache : un nom déjà enrichi n'est jamais redemandé. Les noms de Limitless sont convertis en identifiants PokéAPI (« Hisuian Arcanine » donne `arcanine-hisui`, « Indeedee ♀ » `indeedee-female`) ; un nom introuvable est affiché et réessayé au passage suivant, sans bloquer le reste. Les résultats partent par lots de 50 : si PokéAPI tombe en route, les lots déjà envoyés restent enregistrés.
 
 ### Saisie d'un tournoi local (étape 2)
 

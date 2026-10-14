@@ -11,10 +11,19 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.auth import current_user_id
 from app.db import Conn
-from app.schemas import Name
+from app.schemas import STATS, Name
 
 router = APIRouter()
 Names = Annotated[list[str], Query(alias="pokemon", max_length=6)]
+# Types de l'espèce `pk`, dans l'ordre, en une colonne texte (type1,type2) : voir split_types.
+TYPES = (
+    "(SELECT GROUP_CONCAT(ty.name ORDER BY pt.slot) FROM pokemon_type pt"
+    " JOIN type ty ON ty.id = pt.type_id WHERE pt.pokemon_id = pk.id) AS types"
+)
+
+
+def split_types(types: str | None) -> list[str]:
+    return types.split(",") if types else []
 
 
 def winrate(row: dict) -> dict:
@@ -65,6 +74,34 @@ def formats(conn: Conn) -> list[dict]:
 def legal(code: str, conn: Conn) -> list[str]:
     with conn.cursor() as cur:
         return legal_pokemon(cur, code)
+
+
+@router.get("/api/pokemon")
+def pokemon_info(
+    conn: Conn,
+    names: Names = [],  # noqa: B006
+) -> list[dict]:
+    """Types et statistiques de base (PokéAPI) des Pokémon demandés ; `stats` vaut None s'ils manquent."""
+    if not names:
+        return []
+    where, args = in_names("pk.name", names)
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT pk.name, ps.hp, ps.atk, ps.def, ps.spa, ps.spd, ps.spe, "
+            + TYPES
+            + " FROM pokemon pk LEFT JOIN pokemon_stats ps ON ps.pokemon_id = pk.id"
+            " WHERE TRUE" + where + " ORDER BY pk.name",
+            args,
+        )
+        rows = cur.fetchall()
+    return [
+        {
+            "name": r["name"],
+            "types": split_types(r["types"]),
+            "stats": {s: r[s] for s in STATS} if r["hp"] is not None else None,
+        }
+        for r in rows
+    ]
 
 
 @router.get("/api/stats/pokemon")

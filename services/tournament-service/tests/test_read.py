@@ -41,7 +41,11 @@ def test_detail_has_top16_teams_and_matches(client, db):
         "name": "Rillaboom",
         "item": "Sitrus Berry",
         "ability": "Intimidate",
-        "moves": ["Protect", "Fake Out"],
+        "types": [],  # pas encore enrichi par PokéAPI
+        "moves": [
+            {"name": "Protect", "type": None, "category": None, "power": None},
+            {"name": "Fake Out", "type": None, "category": None, "power": None},
+        ],
     }
     assert [p["name"] for p in first["team"]] == [
         "Rillaboom",
