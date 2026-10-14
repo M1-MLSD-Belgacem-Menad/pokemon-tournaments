@@ -32,6 +32,8 @@ spec:
                 # Appel par le nom DNS interne du Service, sans passer par l'Ingress.
                 - name: TOURNAMENT_API_URL
                   value: http://tournament-service:8000
+                - name: TOURNAMENT_GRPC_TARGET
+                  value: tournament-service:50051
                 # Assez large pour couvrir une journée de tournois : ceux commencés depuis moins de 24 h
                 # sont ignorés et repris le lendemain, ceux déjà en base sont ignorés par l'import.
                 - name: SCRAPE_LIMIT

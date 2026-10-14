@@ -71,6 +71,7 @@ services:
     profiles: [scraper]
     environment:
       TOURNAMENT_API_URL: http://tournament-service:8000
+      TOURNAMENT_GRPC_TARGET: tournament-service:50051
       SCRAPE_LIMIT: ${SCRAPE_LIMIT:-5}
     depends_on:
       tournament-service:
