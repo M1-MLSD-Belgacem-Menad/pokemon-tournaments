@@ -73,7 +73,7 @@ Préfixes routés par la gateway. Les routes en écriture exigent un jeton.
 
 ## 3. Schéma de base de données évolutif
 
-Format de jeu : **VGC (combat en double), règlement en vigueur** (décision du 14/10). Le schéma suit l'enrichissement progressif de F-02. **[Reco]** Chaque évolution est un fichier SQL numéroté (`db/migrations/tournament/001_*.sql`, `002_*.sql`…) appliqué au démarrage par un petit script qui tient une table `schema_version`. C'est une vingtaine de lignes, plus simple qu'Alembic et suffisant pour ce projet.
+Format de jeu : **VGC (combat en double), règlement en vigueur** (décision du 14/10). Le schéma suit l'enrichissement progressif de F-02. **[Reco]** Chaque évolution est un fichier SQL numéroté dans le service qui possède le schéma (`services/tournament-service/migrations/001_*.sql`, `002_*.sql`…) appliqué au démarrage par un petit script qui tient une table `schema_version`. C'est une vingtaine de lignes, plus simple qu'Alembic et suffisant pour ce projet.
 
 ### `tournament_db`, version 1 (étape 1, noms uniquement)
 
@@ -232,13 +232,10 @@ pokemon-tournaments/
 ├── README.md
 ├── docs/                      ce dossier
 ├── services/
-│   ├── tournament-service/    app/, tests/, Dockerfile, pyproject.toml, uv.lock
-│   ├── user-service/          app/, tests/, Dockerfile, pyproject.toml, uv.lock
+│   ├── tournament-service/    app/, migrations/, tests/, Dockerfile, pyproject.toml, uv.lock
+│   ├── user-service/          app/, migrations/, tests/, Dockerfile, pyproject.toml, uv.lock
 │   ├── scraper/               scraper/, tests/fixtures/, Dockerfile, pyproject.toml, uv.lock
 │   └── frontend/              app/, templates/, static/, Dockerfile, pyproject.toml, uv.lock
-├── db/migrations/
-│   ├── tournament/            001_init.sql, 002_types.sql…
-│   └── user/                  001_init.sql
 ├── k8s/
 ├── docker-compose.yml
 ├── .env.example               variables sans valeurs secrètes
