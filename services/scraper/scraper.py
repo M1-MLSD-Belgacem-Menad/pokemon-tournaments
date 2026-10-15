@@ -230,7 +230,8 @@ def fetch_move(name):
         "name": name,
         "type": data["type"]["name"],
         "category": data["damage_class"]["name"],
-        "power": data["power"],  # None pour une attaque de statut
+        # None pour une attaque de statut, parfois 0 (Dragon Cheer) : refusé par le tournament-service.
+        "power": data["power"] or None,
     }
 
 
