@@ -29,7 +29,7 @@ spec:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
                 capabilities: { drop: [ALL] }
-              # Mesures sur minikube avec 25 tournois (non mesuré : marge pour les gros tournois) ; limite mémoire autour de 2,5 fois le pic.
+              # Pic non mesuré. Un import complet de 25 tournois (130 joueurs au plus) est passé sous cette limite sur kind.
               resources:
                 requests: { cpu: 50m, memory: 64Mi }
                 limits: { cpu: 500m, memory: 256Mi }

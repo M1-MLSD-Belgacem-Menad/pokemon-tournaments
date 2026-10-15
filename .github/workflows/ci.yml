@@ -18,8 +18,9 @@ jobs:
       - run: uvx ruff@0.16.8 format --check .
       - run: kubectl kustomize k8s > k8s.yaml  # manifestes Kubernetes bien formés, tels que déployés
       # Mauvaises configurations Kubernetes (Trivy) : échec sur toute alerte HIGH ou CRITICAL.
+      # Image figée par empreinte : une étiquette peut être réécrite (compromission de Trivy en mars 2026, GHSA-69fq-xp46-6x23).
       - run: >-
-          docker run --rm -v "$PWD/k8s.yaml:/k8s.yaml:ro" aquasec/trivy:0.74.0
+          docker run --rm -v "$PWD/k8s.yaml:/k8s.yaml:ro" aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
           config --severity HIGH,CRITICAL --exit-code 1 /k8s.yaml
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -30,6 +31,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false  # un service en échec n'annule pas les tests des autres
       matrix:
         dir: [services/tournament-service, services/user-service, services/scraper, services/frontend]
     defaults:
@@ -54,12 +56,15 @@ jobs:
           version: 0.11.32
       - run: uv sync --frozen
       - run: uv run pytest
-      - run: docker build -t image-ci .
-      # Failles de l'image (Trivy) : échec sur une faille HIGH ou CRITICAL qui a un correctif, c'est-à-dire
-      # qu'il suffit de reconstruire l'image ou de monter une dépendance. Les autres ne bloquent pas.
+      - run: docker build -t image-ci . && docker save image-ci -o image.tar
+      # Failles de l'image (Trivy), lue depuis une archive : Trivy n'a pas accès au démon Docker.
+      # Seules comptent les failles HIGH ou CRITICAL qui ont un correctif. Elles bloquent la publication
+      # (tag v*) ; sur une PR elles sont seulement affichées, car l'image Python de base est souvent
+      # reconstruite plusieurs jours après le correctif Debian et la PR n'y pourrait rien.
       - run: >-
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.74.0
-          image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 image-ci
+          docker run --rm -v "$PWD/image.tar:/image.tar:ro" aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+          image --input /image.tar --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed
+          --exit-code ${{ startsWith(github.ref, 'refs/tags/v') && '1' || '0' }}
 
   # Déploie k8s/ sur un cluster jetable (kind) puis lance k8s/smoke-test.sh : pods prêts, gateway en HTTPS,
   # /internal/ fermé, NetworkPolicy, droits des comptes de service et Pod Security. kindnet applique les NetworkPolicy.
@@ -76,7 +81,7 @@ jobs:
       - name: Gateway (même ingress-nginx que sur GKE)
         run: |
           kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
-          kubectl -n ingress-nginx wait --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=300s
+          kubectl -n ingress-nginx rollout status deployment/ingress-nginx-controller --timeout=300s
       - name: Images construites ici, aux noms et versions de k8s/kustomization.yaml
         run: |
           for pair in tournament:tournament-service user:user-service frontend:frontend scraper:scraper; do
@@ -124,9 +129,10 @@ jobs:
       - uses: actions/checkout@v4
       # Images pour amd64 (PC, GKE) et arm64 (Mac Apple Silicon, minikube compris) : chaque machine
       # tire la variante de son processeur. QEMU émule arm64 sur le runner, qui est en amd64.
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      # Ce job a le jeton Docker Hub : actions figées par commit, une étiquette pouvant être déplacée.
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130  # v3.7.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}

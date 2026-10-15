@@ -7,3 +7,9 @@ metadata:
     # (non-root, sans élévation de privilèges ni capacités Linux, seccomp). Version figée du profil.
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/enforce-version: v1.33
+    # enforce ne juge que les pods : warn et audit signalent dès l'apply un Deployment ou un CronJob
+    # non conforme, au lieu d'un refus au moment où il crée ses pods.
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.33
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.33

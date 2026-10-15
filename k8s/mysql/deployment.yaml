@@ -28,11 +28,14 @@ spec:
       containers:
         - name: mysql
           image: mysql:8.4
+          # Tables temporaires internes (GROUP BY des statistiques) : jusqu'à 1 Go en mémoire par défaut,
+          # toute la limite du conteneur. Au-delà de 128 Mo, MySQL les passe sur disque.
+          args: ["--temptable-max-ram=128M"]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: { drop: [ALL] }
-          # Mesures sur minikube avec 25 tournois (pic mesuré 462 Mo) ; limite mémoire autour de 2,5 fois le pic.
+          # Mesures sur minikube avec 25 tournois : pic de 462 Mo, d'où une limite à un peu plus du double.
           resources:
             requests: { cpu: 250m, memory: 512Mi }
             limits: { cpu: 1, memory: 1Gi }
