@@ -21,7 +21,7 @@
             │ Pokémon, stats      │  F-01, F-04, F-05, F-06
             └───────▲──────┬──────┘
                     │      │ SQL
-     POST /internal │  ┌───▼──────────────────────┐
+     gRPC Import    │  ┌───▼──────────────────────┐
    ┌────────────────┴┐ │ MySQL                    │  T-08, T-14
    │ scraper         │ │  schéma tournament_db    │
    │ (CronJob K8s)   │ │  schéma user_db          │
@@ -34,7 +34,7 @@
 |---|---|---|
 | `tournament-service` | API REST des tournois, classements, équipes, Pokémon, formats et statistiques. Seul propriétaire du schéma `tournament_db`. | T-01, F-01, F-02, F-04, F-05, F-06, E-03 |
 | `user-service` | Inscription, connexion, émission de jetons JWT. Seul propriétaire du schéma `user_db`. | T-07, F-03, E-03 |
-| `scraper` | Tâche batch qui récupère les résultats sur les sites sources et les envoie au `tournament-service` via son API. Ne touche jamais la base directement. | T-17, E-02, E-03 |
+| `scraper` | Tâche batch qui récupère les résultats sur les sites sources et les envoie au `tournament-service` par gRPC (enrichissement PokéAPI en REST). Ne touche jamais la base directement. | T-17, E-02, E-03 |
 | `frontend` | Pages web. N'appelle que les API, sans logique métier. | E-01, B-01 (présentation) |
 | Gateway | Point d'entrée unique, routage par préfixe d'URL. | T-06, E-04 |
 | MySQL | Persistance, un schéma par service. | T-08, T-14 |
@@ -150,6 +150,7 @@ CREATE TABLE team_pokemon (
 | 007 | Statistiques | `pokemon_stats(pokemon_id, hp, atk, def, spa, spd, spe)`, et colonnes `move.type_id`, `category`, `power`, depuis PokéAPI |
 | 008 | Étape 2 | `tournament.created_by` (id utilisateur, sans clé étrangère car il vit dans `user_db`), `tournament.detail_level ENUM('winner','top16')` |
 | 009 | Étape 3 | `saved_team(id, user_id, name, format_id)`, `saved_team_pokemon(saved_team_id, slot, pokemon_id)` ; les Pokémon légaux sont calculés (décision 6), pas stockés |
+| 010 | Sprites | `pokemon_stats.sprite_url` (image PokéAPI) ; une espèce sans sprite est redemandée au prochain enrichissement |
 
 Toutes les colonnes ajoutées après la v1 sont **nullables**, pour que les données déjà scrapées restent valides.
 
@@ -185,7 +186,7 @@ CREATE TABLE app_user (
 
 ### Enrichissement des Pokémon
 
-Décision du 14/10 : source la plus simple. La commande `python scraper.py enrich`, aussi lancée à la fin de chaque scraping, demande au `tournament-service` les Pokémon sans statistiques et les attaques sans catégorie (`GET /internal/enrich/missing`), les cherche sur l'API publique PokéAPI, puis envoie types, statistiques de base et type, catégorie et puissance des attaques (`POST /internal/enrich`). Les talents, objets et attaques réellement joués viennent des équipes scrapées. La base sert de cache : un nom déjà enrichi n'est jamais redemandé. Les noms de Limitless sont convertis en identifiants PokéAPI (« Hisuian Arcanine » donne `arcanine-hisui`, « Indeedee ♀ » `indeedee-female`) ; un nom introuvable est affiché et réessayé au passage suivant, sans bloquer le reste. Les résultats partent par lots de 50 : si PokéAPI tombe en route, les lots déjà envoyés restent enregistrés.
+Décision du 14/10 : source la plus simple. La commande `python scraper.py enrich`, aussi lancée à la fin de chaque scraping, demande au `tournament-service` les Pokémon sans statistiques et les attaques sans catégorie (`GET /internal/enrich/missing`), les cherche sur l'API publique PokéAPI, puis envoie types, statistiques de base, sprite, et type, catégorie et puissance des attaques (`POST /internal/enrich`). Le sprite n'est accepté que s'il vient du dépôt `raw.githubusercontent.com/PokeAPI/sprites`, car il est affiché tel quel dans une balise `<img>`. Les drapeaux des joueurs viennent du code pays de Limitless, en images de flagcdn.com ; les sprites et les drapeaux sont chargés par le navigateur, pas par les services. Les talents, objets et attaques réellement joués viennent des équipes scrapées. La base sert de cache : un nom déjà enrichi n'est jamais redemandé. Les noms de Limitless sont convertis en identifiants PokéAPI (« Hisuian Arcanine » donne `arcanine-hisui`, « Indeedee ♀ » `indeedee-female`) ; un nom introuvable est affiché et réessayé au passage suivant, sans bloquer le reste. Les résultats partent par lots de 50 : si PokéAPI tombe en route, les lots déjà envoyés restent enregistrés.
 
 ### Saisie d'un tournoi local (étape 2)
 
@@ -228,6 +229,8 @@ k8s/
 ### Cloud (palier 20/20, bonus)
 
 **[Reco]** GKE, cohérent avec les labs Google (LABS) ; création du cluster par Terraform (vu en cours). À ne lancer qu'après un déploiement minikube stable.
+
+Fait à l'étape 12 : `infra/gke/` (Terraform, fournisseur `hashicorp/google`) crée un cluster **zonal** `pokemon` de deux nœuds `e2-medium` en `europe-west1-b`, avec **Dataplane V2** pour appliquer les NetworkPolicy. Les manifestes `k8s/` sont les mêmes que sur minikube ; ingress-nginx est installé depuis son manifeste « cloud » (version figée), qui expose la gateway par un Service `LoadBalancer`. L'état Terraform reste local (projet d'un seul utilisateur, cluster détruit après les captures).
 
 ## 6. Structure du dépôt
 

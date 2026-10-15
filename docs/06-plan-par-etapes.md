@@ -163,7 +163,7 @@ Au choix selon le temps, à trancher au début de S8 :
 
 **Critère de réussite** : capture de l'appli servie depuis GKE, ou import réussi par gRPC avec son test.
 
-Choix de Menad (14 oct.) : les deux, gRPC d'abord (fait : `TournamentImporter.Import`, tests des deux côtés), puis GKE par Terraform.
+Choix de Menad (14 oct.) : les deux. gRPC fait (`TournamentImporter.Import`, tests des deux côtés) ; GKE écrit dans `infra/gke/` (Terraform, validé en CI), à lancer par Menad avec son compte Google Cloud (README, « Déploiement sur GKE »).
 
 ## Étape 13 : rendu (S9, puis marge jusqu'au 27 déc.)
 

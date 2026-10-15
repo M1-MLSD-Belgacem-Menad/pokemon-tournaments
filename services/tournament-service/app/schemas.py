@@ -99,12 +99,15 @@ class LocalTournament(BaseModel):
 
 
 STATS = ("hp", "atk", "def", "spa", "spd", "spe")  # ordre des statistiques de base
+SPRITE_URL = r"^https://raw\.githubusercontent\.com/PokeAPI/sprites/master/sprites/pokemon/[\w/-]+\.png$"
 
 
 class PokemonInfo(BaseModel):
     name: Name
     types: list[Name] = Field(min_length=1, max_length=2)
     stats: list[int] = Field(min_length=6, max_length=6)  # dans l'ordre de STATS
+    # Affiché en <img src> : seulement une image du dépôt de sprites de PokéAPI, sans « .. » ni « ? ».
+    sprite: str | None = Field(default=None, max_length=255, pattern=SPRITE_URL)
 
 
 class MoveInfo(BaseModel):

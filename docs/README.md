@@ -2,7 +2,7 @@
 
 Application web autour des résultats de tournois Pokémon : recensement des tournois par scraping, espace utilisateur pour saisir des tournois locaux, et créateur d'équipes avec statistiques de winrate. Projet de M1 (cours de programmation distribuée), réalisé en deux mois.
 
-> **Statut** : étape 12 du [plan par étapes](06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL, avec objets, talents, attaques, types et statistiques), `user-service` (inscription, connexion, JWT), `scraper` (Limitless, import par gRPC, puis enrichissement par PokéAPI), `frontend` (liste et détail des tournois, connexion, saisie d'un tournoi local, créateur d'équipe avec winrates), Docker Compose, CI, publication Docker Hub et manifestes Kubernetes (Ingress HTTPS, scraper quotidien, comptes de service sans droits, NetworkPolicy). Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
+> **Statut** : étape 12 du [plan par étapes](06-plan-par-etapes.md) en cours. Existe déjà : `tournament-service` (import et lecture des tournois dans MySQL, avec objets, talents, attaques, types et statistiques), `user-service` (inscription, connexion, JWT), `scraper` (Limitless, import par gRPC, puis enrichissement par PokéAPI), `frontend` (liste et détail des tournois avec drapeaux et sprites, connexion, saisie d'un tournoi local, créateur d'équipe avec winrates), Docker Compose, CI, publication Docker Hub et manifestes Kubernetes (Ingress HTTPS, scraper quotidien, comptes de service sans droits, NetworkPolicy), cluster GKE par Terraform. Les autres commandes ci-dessous décrivent le fonctionnement **cible**, tel que prévu dans l'[architecture](02-architecture.md). Elles seront vérifiées et corrigées au fur et à mesure du développement.
 
 ## Documentation
 
@@ -15,6 +15,7 @@ Application web autour des résultats de tournois Pokémon : recensement des tou
 | [04-guide-de-contribution.md](04-guide-de-contribution.md) | Workflow GitHub, conventions de code, de commit et de test |
 | [05-checklist-conformite.md](05-checklist-conformite.md) | Liste à cocher avant le rendu |
 | [06-plan-par-etapes.md](06-plan-par-etapes.md) | Les 13 étapes de réalisation, avec résultat attendu et critère de réussite |
+| [rapport/rapport.md](rapport/rapport.md) | Mini rapport du rendu : paliers atteints, architecture, captures d'écran |
 
 ## Fonctionnalités
 
@@ -36,7 +37,7 @@ Application web autour des résultats de tournois Pokémon : recensement des tou
 
 ## Architecture en bref
 
-Trois services Python et un frontend derrière une gateway Ingress : `tournament-service` (tournois, Pokémon, statistiques), `user-service` (comptes, JWT), `scraper` (CronJob qui alimente le `tournament-service` par son API), `frontend` (pages HTML). Un serveur MySQL avec un schéma par service. Détails dans [02-architecture.md](02-architecture.md).
+Trois services Python et un frontend derrière une gateway Ingress : `tournament-service` (tournois, Pokémon, statistiques), `user-service` (comptes, JWT), `scraper` (CronJob qui alimente le `tournament-service` par gRPC), `frontend` (pages HTML). Un serveur MySQL avec un schéma par service. Détails dans [02-architecture.md](02-architecture.md).
 
 ## Prérequis
 
@@ -139,6 +140,66 @@ kubectl auth can-i --as=system:serviceaccount:pokemon:tournament-service list po
 curl -k -X POST https://pokemon.local/internal/import
 # Le port gRPC n'accepte que le scraper : le frontend obtient un TimeoutError.
 kubectl -n pokemon exec deploy/frontend -- .venv/bin/python -c "import socket; socket.create_connection(('tournament-service', 50051), timeout=3)"
+```
+
+## Déploiement sur GKE (Terraform)
+
+Palier « cloud » : `infra/gke/` crée un cluster Google Kubernetes Engine avec Terraform, puis on y applique **les mêmes manifestes** que sur minikube. Seul le cluster change : les NetworkPolicy sont appliquées par Dataplane V2 (à la place de Calico), et la gateway reçoit une IP publique (Service `LoadBalancer`).
+
+Il faut un projet Google Cloud avec la facturation activée (crédits d'essai ou des labs), et les images de la version de `k8s/kustomization.yaml` publiées sur [Docker Hub](#publier-une-version). Coût indicatif : deux nœuds `e2-medium`, un équilibreur de charge et un disque, soit quelques euros par jour. Le plan de contrôle d'un cluster zonal est couvert par le crédit mensuel gratuit de GKE. **Détruire le cluster après les captures** : tant qu'il tourne, l'application est joignable depuis Internet.
+
+Sous Windows (PowerShell), une seule fois, installer les outils :
+
+```powershell
+winget install Hashicorp.Terraform
+winget install Google.CloudSDK
+```
+
+Puis, dans une **nouvelle** fenêtre PowerShell (pour que `gcloud` et `terraform` soient trouvés), depuis la racine du dépôt :
+
+```powershell
+gcloud components install gke-gcloud-auth-plugin kubectl
+gcloud auth login
+gcloud auth application-default login   # identifiants utilisés par Terraform
+cd infra\gke
+Copy-Item terraform.tfvars.example terraform.tfvars
+```
+
+Mettre l'identifiant du projet dans `infra\gke\terraform.tfvars` (non versionné), puis créer le cluster (environ 10 minutes, `terraform apply` demande de taper `yes`) :
+
+```powershell
+terraform init
+terraform apply
+terraform output -raw kubectl_credentials | Invoke-Expression   # kubectl vise maintenant GKE
+cd ..\..
+```
+
+`terraform init` crée `infra/gke/.terraform.lock.hcl` (versions exactes des fournisseurs) : le committer.
+
+La gateway : le même contrôleur ingress-nginx que l'addon de minikube, en version figée. Le projet ingress-nginx a arrêté sa maintenance en 2026 ; on limite donc l'équilibreur de charge à sa propre adresse IP.
+
+```powershell
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
+kubectl -n ingress-nginx wait --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=300s
+$ip = Invoke-RestMethod https://api.ipify.org
+"spec: {loadBalancerSourceRanges: [$ip/32]}" | Set-Content lb.yaml
+kubectl -n ingress-nginx patch svc ingress-nginx-controller --patch-file lb.yaml
+Remove-Item lb.yaml
+kubectl -n ingress-nginx get svc ingress-nginx-controller --watch   # attendre l'EXTERNAL-IP, puis Ctrl+C
+```
+
+Ensuite, les commandes de la section minikube à partir de `kubectl apply -f k8s/namespace.yaml` (secrets, certificat, `kubectl apply -k k8s/`), et la vérification de la [sécurité du cluster](#sécurité-du-cluster). Dans le fichier hosts, `pokemon.local` pointe vers l'EXTERNAL-IP : `34.x.x.x pokemon.local`.
+
+Pour tout supprimer, dans cet ordre. Le disque de MySQL et l'équilibreur de charge ne sont supprimés que par le cluster lui-même : s'il disparaît avant eux, ils restent facturés.
+
+```powershell
+kubectl delete namespace pokemon
+kubectl wait --for=delete pv --all --timeout=300s   # le disque de MySQL est supprimé
+kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
+cd infra\gke
+terraform destroy
+cd ..\..
+kubectl config use-context minikube   # kubectl vise de nouveau minikube
 ```
 
 ## Publier une version

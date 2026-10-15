@@ -41,3 +41,9 @@ __pycache__/
 # --- Certificat HTTPS de minikube (README) ---
 tls.key
 tls.crt
+
+# --- Terraform (état local, identifiant du projet, plugins) ---
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars

@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -28,6 +29,12 @@ TYPES_FR = {
 CATEGORIES_FR = {"physical": "physique", "special": "spéciale", "status": "statut"}
 templates.env.filters["type_fr"] = lambda t: TYPES_FR.get(t, t)
 templates.env.filters["category_fr"] = lambda c: CATEGORIES_FR.get(c, c)
+# Drapeau d'un code pays ISO à 2 lettres (Limitless), chargé par le navigateur depuis flagcdn.com.
+templates.env.filters["flag"] = lambda c: (
+    f"https://flagcdn.com/w20/{c.lower()}.png"
+    if re.fullmatch(r"[A-Za-z]{2}", c or "")
+    else None
+)
 app = FastAPI(title="frontend")
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 

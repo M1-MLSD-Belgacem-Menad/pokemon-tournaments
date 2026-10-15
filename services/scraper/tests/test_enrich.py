@@ -81,12 +81,14 @@ def test_enrich_envoie_ce_que_pokeapi_connait(api, capsys):
             "name": "Wash Rotom",
             "types": ["electric", "water"],
             "stats": [50, 65, 107, 105, 107, 86],
+            "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/10009.png",
         },
         # Aegislash sans forme : forme par défaut de l'espèce (aegislash-shield).
         {
             "name": "Aegislash",
             "types": ["steel", "ghost"],
             "stats": [60, 50, 140, 50, 140, 60],
+            "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/681.png",
         },
     ]
     assert body["moves"] == [
@@ -116,3 +118,15 @@ def test_forme_inconnue_pas_remplacee_par_l_espece(api, monkeypatch):
     # « Rotom Inconnu » : pas de repli sur l'espèce Rotom, qui n'a pas les mêmes types.
     monkeypatch.setitem(POKEAPI, "pokemon-species/rotom", {"varieties": []})
     assert scraper.fetch_pokemon("Inconnu Rotom") is None
+
+
+@pytest.mark.parametrize(
+    "sprite",
+    [None, "https://exemple.fr/1.png", scraper.POKEAPI + "/../x.png"],
+)
+def test_sprite_inattendu_remplace_par_none(sprite):
+    data = POKEAPI["pokemon/rotom-wash"] | {"sprites": {"front_default": sprite}}
+    assert scraper.parse_pokemon("Wash Rotom", data)["sprite"] is None
+    assert (
+        scraper.parse_pokemon("Wash Rotom", {**data, "sprites": None})["sprite"] is None
+    )
