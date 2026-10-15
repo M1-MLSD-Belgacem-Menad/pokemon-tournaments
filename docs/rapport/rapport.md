@@ -138,7 +138,8 @@ L'application servie depuis GKE, avec l'adresse de l'équilibreur de charge.
   - `kubectl kustomize` ;
   - `terraform fmt` et `validate` ;
   - tests des quatre services, sur une vraie base MySQL jetable ;
-  - construction des quatre images.
+  - construction des quatre images ;
+  - déploiement complet sur un cluster kind jetable, vérifié par `k8s/smoke-test.sh` (gateway en HTTPS, `/internal/` fermé, NetworkPolicy, droits des comptes de service, conteneurs non-root).
 - **149 tests** au 15 octobre : 66 pour le `tournament-service`, 20 pour le `user-service`, 28 pour le scraper, 35 pour le frontend. Le scraper n'appelle jamais les vrais sites pendant les tests. Il utilise des réponses enregistrées de Limitless et de PokéAPI.
 - **Une PR par étape**, liée à son issue, relue (revue de code) avant fusion.
 - **Vérification « comme le correcteur »** : clone propre, tests verts, `docker compose up --build`, import d'un tournoi par gRPC, pages, inscription et connexion vérifiées (cases cochées dans [`docs/05-checklist-conformite.md`](../05-checklist-conformite.md)).

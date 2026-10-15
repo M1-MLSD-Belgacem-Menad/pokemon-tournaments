@@ -52,11 +52,56 @@ jobs:
       - run: uv run pytest
       - run: docker build .
 
-  # Au push d'un tag v* (ex. v0.1.0), une fois lint et tests verts : publie <compte>/pokemon-<service>:0.1.0.
+  # Déploie k8s/ sur un cluster jetable (kind) puis lance k8s/smoke-test.sh : pods prêts, gateway en HTTPS,
+  # /internal/ fermé, NetworkPolicy et droits des comptes de service. kindnet applique les NetworkPolicy.
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cluster kind
+        run: |
+          curl -sSLo kind https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64
+          echo "aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d  kind" | sha256sum -c
+          sudo install kind /usr/local/bin/kind
+          kind create cluster --name pokemon --wait 120s
+      - name: Gateway (même ingress-nginx que sur GKE)
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
+          kubectl -n ingress-nginx wait --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=300s
+      - name: Images construites ici, aux noms et versions de k8s/kustomization.yaml
+        run: |
+          for pair in tournament:tournament-service user:user-service frontend:frontend scraper:scraper; do
+            image=$(kubectl kustomize k8s | grep -m1 -o "[^ ]*/pokemon-${pair%%:*}:[^ ]*")
+            docker build -t "$image" "services/${pair#*:}"
+            kind load docker-image "$image" --name pokemon
+          done
+      - name: Secrets jetables et déploiement
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl -n pokemon create secret generic app-secrets \
+            --from-literal=MYSQL_ROOT_PASSWORD="$(openssl rand -hex 16)" \
+            --from-literal=TOURNAMENT_DB_USER=tournament \
+            --from-literal=TOURNAMENT_DB_PASSWORD="$(openssl rand -hex 16)" \
+            --from-literal=USER_DB_USER=users \
+            --from-literal=USER_DB_PASSWORD="$(openssl rand -hex 16)" \
+            --from-literal=JWT_SECRET="$(openssl rand -hex 32)"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=pokemon.local" \
+            -addext "subjectAltName=DNS:pokemon.local" -keyout tls.key -out tls.crt
+          kubectl -n pokemon create secret tls pokemon-tls --cert=tls.crt --key=tls.key
+          kubectl apply -k k8s/
+      - run: k8s/smoke-test.sh
+      - name: État du cluster en cas d'échec
+        if: failure()
+        run: |
+          kubectl -n pokemon get pods,svc,endpointslices,networkpolicy
+          kubectl -n pokemon get events --sort-by=.lastTimestamp | tail -30
+          kubectl -n pokemon logs deploy/tournament-service --all-containers --tail=50 || true
+
+  # Au push d'un tag v* (ex. v0.1.0), une fois lint, tests et déploiement verts : publie <compte>/pokemon-<service>:0.1.0.
   # Secrets GitHub à créer : DOCKERHUB_USERNAME (en minuscules) et DOCKERHUB_TOKEN (jeton d'accès Docker Hub).
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [lint, test]
+    needs: [lint, test, deploy]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
