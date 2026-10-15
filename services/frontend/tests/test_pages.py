@@ -32,6 +32,7 @@ TOURNAMENT = {
             "team": [
                 {
                     "name": "Staraptor",
+                    "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/398.png",
                     "item": "Staraptite",
                     "ability": "Intimidate",
                     "types": ["normal", "flying"],
@@ -136,6 +137,8 @@ def test_detail_affiche_le_classement_et_l_equipe(api):
     assert (
         "Close Combat</li>" in resp.text
     )  # sans détails tant qu'elle n'est pas enrichie
+    assert 'src="https://flagcdn.com/w20/jp.png"' in resp.text
+    assert resp.text.count('class="sprite"') == 1  # Indeedee n'a pas de sprite
 
 
 def test_equipe_absente_est_signalee(monkeypatch):
@@ -375,6 +378,7 @@ def stats_api(monkeypatch):
             {
                 "name": "X",
                 "types": ["water"],
+                "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png",
                 "stats": dict(
                     zip(["hp", "atk", "def", "spa", "spd", "spe"], [1, 2, 3, 4, 5, 6])
                 ),
@@ -405,6 +409,7 @@ def test_builder_affiche_les_winrates(stats_api):
     assert '<span class="type">Eau</span>' in resp.text
     assert '<td class="num">21</td>' in resp.text  # total des statistiques de X
     assert "pas encore chargées depuis PokéAPI" in resp.text  # Y
+    assert resp.text.count('class="sprite"') == 1  # X ; Y n'a pas de sprite
     assert "Se connecter" in resp.text  # pas connecté : pas d'enregistrement
 
 
@@ -450,3 +455,9 @@ def test_builder_ignore_les_pokemon_hors_format(stats_api):
     )
     assert resp.status_code == 200
     assert not any("W" in url for url, _, _ in stats_api[1])
+
+
+def test_drapeau_seulement_pour_un_code_pays():
+    flag = main.templates.env.filters["flag"]
+    assert flag("FR") == "https://flagcdn.com/w20/fr.png"
+    assert flag(None) is None and flag("") is None and flag("1/") is None

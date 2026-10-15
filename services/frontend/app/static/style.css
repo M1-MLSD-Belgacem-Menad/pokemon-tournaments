@@ -21,3 +21,5 @@ nav button { background: none; border: 1px solid #fff; color: #fff; border-radiu
 .ok { background: #eafaf1; border-left: 4px solid #27ae60; padding: 0.6rem; }
 .num { white-space: nowrap; }
 .type { display: inline-block; background: #555; color: #fff; border-radius: 0.3rem; padding: 0 0.3rem; margin-right: 0.2rem; font-size: 0.75rem; }
+.sprite { vertical-align: middle; margin-right: 0.3rem; image-rendering: pixelated; }
+.flag { vertical-align: baseline; }

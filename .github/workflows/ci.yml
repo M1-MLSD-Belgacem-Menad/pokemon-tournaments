@@ -17,6 +17,11 @@ jobs:
       - run: uvx ruff@0.16.8 check .
       - run: uvx ruff@0.16.8 format --check .
       - run: kubectl kustomize k8s > /dev/null  # manifestes Kubernetes bien formés
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.4
+      - run: terraform -chdir=infra/gke fmt -check
+      - run: terraform -chdir=infra/gke init -backend=false -input=false && terraform -chdir=infra/gke validate
 
   test:
     runs-on: ubuntu-latest
