@@ -131,7 +131,7 @@ def test_detail_affiche_le_classement_et_l_equipe(api):
         and "Intimidate" in resp.text
         and "Tailwind" in resp.text
     )
-    assert '<span class="type">Vol</span>' in resp.text  # types en français
+    assert '<span class="type t-flying">Vol</span>' in resp.text  # types en français
     assert "Brave Bird <span" in resp.text and "(Vol, physique, 120)" in resp.text
     assert "(Vol, statut)" in resp.text  # pas de puissance
     assert (
@@ -147,7 +147,23 @@ def test_equipe_absente_est_signalee(monkeypatch):
     }
     responses = {"http://api/api/tournaments/1?top=16": sans_equipe}
     monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
-    assert "équipe non publiée" in client.get("/tournaments/1").text
+    html = client.get("/tournaments/1").text
+    assert "équipe non publiée" in html
+    assert "<details>" not in html  # rien à déplier
+
+
+def test_joueur_sans_place_ne_plante_pas(monkeypatch):
+    abandon = TOURNAMENT | {
+        "standings": [TOURNAMENT["standings"][0] | {"placement": None}]
+    }
+    responses = {"http://api/api/tournaments/1?top=16": abandon}
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
+    assert client.get("/tournaments/1").status_code == 200
+
+
+def test_menu_marque_la_page_courante(api):
+    assert '<a href="/" aria-current="page">' in client.get("/tournaments/1").text
+    assert '<a href="/builder" aria-current="page">' not in client.get("/").text
 
 
 def test_tournoi_inconnu_renvoie_404(api):
@@ -406,8 +422,8 @@ def test_builder_affiche_les_winrates(stats_api):
     )
     assert "83.3 %" in resp.text and "X + Y" in resp.text and "100.0 %" in resp.text
     assert "Z 100.0 % (5)" in resp.text  # matchup
-    assert '<span class="type">Eau</span>' in resp.text
-    assert '<td class="num">21</td>' in resp.text  # total des statistiques de X
+    assert '<span class="type t-water">Eau</span>' in resp.text
+    assert '<td class="num strong">21</td>' in resp.text  # total des statistiques de X
     assert "pas encore chargées depuis PokéAPI" in resp.text  # Y
     assert resp.text.count('class="sprite"') == 1  # X ; Y n'a pas de sprite
     assert "Se connecter" in resp.text  # pas connecté : pas d'enregistrement

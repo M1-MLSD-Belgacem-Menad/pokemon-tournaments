@@ -1,37 +1,48 @@
 {% extends "base.html" %}
 {% block title %}{{ t.name }}{% endblock %}
+{% macro row(s) %}
+        <span class="place">{{ s.placement }}</span>
+        {% set flag = s.country | flag %}
+        <span class="player"><strong>{{ s.player }}</strong>{% if s.country %}<span class="country">{% if flag %}<img class="flag" src="{{ flag }}" alt="" width="16" loading="lazy"> {% endif %}{{ s.country }}</span>{% endif %}</span>
+        <span class="record">{% if s.wins is not none %}{{ s.wins }}-{{ s.losses }}{% if s.ties %}-{{ s.ties }}{% endif %}{% endif %}</span>
+        <span class="roster">
+        {% for p in s.team %}
+          <span title="{{ p.name }}">{% if p.sprite %}<img class="sprite" src="{{ p.sprite }}" alt="{{ p.name }}" width="44" height="44" loading="lazy">{% else %}{{ p.name }}{% endif %}</span>
+        {% else %}
+          <em class="meta">équipe non publiée par l'organisateur</em>
+        {% endfor %}
+        </span>
+{% endmacro %}
 {% block content %}
 <h1>{{ t.name }}</h1>
-<p class="meta">
-  {{ t.date }} · {{ t.format }}{% if t.player_count %} · {{ t.player_count }} joueurs{% endif %}
-  {% if t.source_url %} · <a href="{{ t.source_url }}">source</a>{% endif %}
+<p class="lead">
+  {{ t.date }} · <span class="tag">{{ t.format }}</span>{% if t.player_count %} · {{ t.player_count }} joueurs{% endif %}
+  {% if t.source_url %} · <a href="{{ t.source_url }}">voir la source</a>{% endif %}
 </p>
-<table>
-  <thead><tr><th>#</th><th>Joueur</th><th>Bilan</th><th>Équipe</th></tr></thead>
-  <tbody>
-  {% for s in t.standings %}
-    <tr>
-      <td>{{ s.placement }}</td>
-      {% set flag = s.country | flag %}
-      <td>{{ s.player }}{% if s.country %} <span class="country">{% if flag %}<img class="flag" src="{{ flag }}" alt="" width="20" loading="lazy"> {% endif %}{{ s.country }}</span>{% endif %}</td>
-      <td>{% if s.wins is not none %}{{ s.wins }}-{{ s.losses }}{% if s.ties %}-{{ s.ties }}{% endif %}{% endif %}</td>
-      <td class="team">
+<p class="meta">Cliquer sur un joueur pour voir les objets, talents et attaques de son équipe.</p>
+<ol class="standings">
+{% for s in t.standings %}
+  <li{% if s.placement and s.placement <= 3 %} class="top"{% endif %}>
+  {% if s.team %}
+    <details>
+      <summary>{{ row(s) }}</summary>
+      <div class="sets">
       {% for p in s.team %}
         <div class="mon">
-          {% if p.sprite %}<img class="sprite" src="{{ p.sprite }}" alt="" width="48" height="48" loading="lazy">{% endif %}
-          <strong>{{ p.name }}</strong>{% if p.item %} <span class="item">@ {{ p.item }}</span>{% endif %}
-          {% if p.types %}<div>{% for ty in p.types %}<span class="type">{{ ty | type_fr }}</span>{% endfor %}</div>{% endif %}
+          <div class="mon-head"><strong>{{ p.name }}</strong>{% if p.item %} <span class="item">@ {{ p.item }}</span>{% endif %}</div>
+          {% if p.types %}<div class="types">{% for ty in p.types %}<span class="type t-{{ ty }}">{{ ty | type_fr }}</span>{% endfor %}</div>{% endif %}
           {% if p.ability %}<div class="ability">{{ p.ability }}</div>{% endif %}
           {% if p.moves %}<ul class="moves">{% for m in p.moves %}
             <li>{{ m.name }}{% if m.type %} <span class="meta">({{ m.type | type_fr }}, {{ m.category | category_fr }}{% if m.power %}, {{ m.power }}{% endif %})</span>{% endif %}</li>
           {% endfor %}</ul>{% endif %}
         </div>
-      {% else %}
-        <span class="meta">équipe non publiée par l'organisateur</span>
       {% endfor %}
-      </td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
+      </div>
+    </details>
+  {% else %}
+    <div class="row">{{ row(s) }}</div>
+  {% endif %}
+  </li>
+{% endfor %}
+</ol>
 {% endblock %}
