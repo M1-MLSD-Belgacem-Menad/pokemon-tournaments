@@ -2,3 +2,8 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: pokemon
+  labels:
+    # Pod Security Admission : l'API refuse tout pod qui ne respecte pas le profil « restricted »
+    # (non-root, sans élévation de privilèges ni capacités Linux, seccomp). Version figée du profil.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.33

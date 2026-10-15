@@ -23,7 +23,12 @@ spec:
           image: pokemon-frontend  # compte et version : k8s/kustomization.yaml
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities: { drop: [ALL] }
+          # Mesures sur minikube avec 25 tournois (pic mesuré 83 Mo) ; limite mémoire autour de 2,5 fois le pic.
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 192Mi }
           env:
             - name: TOURNAMENT_API_URL
               value: http://tournament-service:8000
