@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ p.name if p else name }}{% endblock %}
+{% macro bars(rows, title, sprites=false) %}
+<section class="panel">
+  <h2>{{ title }}</h2>
+  {% if rows %}<ul class="bars">
+  {% for r in rows %}{% set v = (r.share * 100) | round | int %}
+    <li style="--pct: {{ [v, 100] | min }}%">{% if sprites %}{% if r.sprite %}<img class="mini" src="{{ r.sprite }}" alt="" width="32" height="32" loading="lazy">{% endif %}<a href="/pokemon/{{ r.name | urlencode }}?format={{ format | urlencode }}">{{ r.name }}</a>{% else %}<span>{{ r.name }}</span>{% endif %}<strong>{{ v }} %</strong></li>
+  {% endfor %}
+  </ul>{% else %}<p class="meta">aucune donnée</p>{% endif %}
+</section>
+{% endmacro %}
+{% block content %}
+{% if not p %}
+<h1>{{ name }}</h1>
+<p class="lead">Ce Pokémon n'a été joué dans aucune équipe connue du format {{ format }}.</p>
+{% else %}
+<div class="panel fiche">
+  {% if p.sprite %}<img class="sprite mon-sprite" src="{{ p.sprite }}" alt="" width="96" height="96">{% endif %}
+  <div>
+    <h1>{{ p.name }}</h1>
+    {% if p.types %}<div class="types">{% for ty in p.types %}<span class="type t-{{ ty }}">{{ ty | type_fr }}</span>{% endfor %}</div>{% endif %}
+    <p class="meta">Format <span class="tag">{{ format }}</span> · joué par <strong>{{ (p.usage * 100) | round | int }} %</strong> des {{ p.format_teams }} équipes · winrate {% if p.winrate is not none %}<strong>{{ "%.1f" | format(p.winrate * 100) }} %</strong> ({{ p.wins }}-{{ p.losses }}){% else %}inconnu{% endif %}</p>
+  </div>
+  {% if p.stats %}
+  <dl class="base-stats">
+  {% for k, label in labels.items() %}{% set v = p.stats[k] %}
+    <div style="--pct: {{ [v / 2, 100] | min }}%"><dt>{{ label }}</dt><dd>{{ v }}</dd></div>
+  {% endfor %}
+  </dl>
+  {% endif %}
+</div>
+<div class="fiche-grid">
+  {# p["items"] : p.items serait la méthode dict.items #}
+  {{ bars(p.moves, "Attaques jouées") }}
+  <div class="stack-panels">{{ bars(p["items"], "Objets") }}{{ bars(p.abilities, "Talents") }}</div>
+  {{ bars(p.teammates, "Joué le plus souvent avec", true) }}
+</div>
+<p class="meta">Pourcentages calculés sur les équipes du format qui alignent {{ p.name }} (tournois importés, avec bilan). Une équipe compte quatre attaques, la somme dépasse donc 100 %.</p>
+{% endif %}
+{% endblock %}

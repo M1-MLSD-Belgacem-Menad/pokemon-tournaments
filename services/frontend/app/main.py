@@ -3,6 +3,7 @@ import os
 import re
 import urllib.error
 import urllib.request
+from collections import Counter
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote, urlencode, urlsplit
@@ -210,14 +211,48 @@ async def new_tournament(request: Request):
     return page(error_message(body), 422)
 
 
+def usage(standings: list[dict], limit: int = 5) -> dict:
+    """Pokémon les plus joués : part (en %) des équipes connues qui l'alignent."""
+    teams = [s.get("team") for s in standings if s.get("team")]
+    # set : un Pokémon compte une fois par équipe, la part ne dépasse jamais 100 %
+    counts = Counter(name for team in teams for name in {p["name"] for p in team})
+    sprites = {}
+    for p in (p for team in teams for p in team):
+        sprites[p["name"]] = sprites.get(p["name"]) or p.get("sprite")
+    top = [
+        {"name": n, "sprite": sprites[n], "pct": round(100 * c / len(teams))}
+        for n, c in counts.most_common(limit)
+    ]
+    return {"teams": len(teams), "top": top}
+
+
 @app.get("/tournaments/{tournament_id}", response_class=HTMLResponse)
 def tournament(request: Request, tournament_id: int):
     """Détail d'un tournoi : top 16 et équipes (l'API a tous les joueurs, on ne demande que ça)."""
+    t = api_get(f"/api/tournaments/{tournament_id}?top=16")
     return templates.TemplateResponse(
-        request,
-        "tournament.html",
-        {"t": api_get(f"/api/tournaments/{tournament_id}?top=16")},
+        request, "tournament.html", {"t": t, "usage": usage(t["standings"])}
     )
+
+
+STATS_FR = {"hp": "PV", "atk": "Att.", "def": "Déf.", "spa": "Att. Spé.", "spd": "Déf. Spé.", "spe": "Vit."}  # fmt: skip
+
+
+@app.get("/pokemon/{name}", response_class=HTMLResponse)
+def pokemon(request: Request, name: str, format: str | None = None):
+    """Fiche d'un Pokémon dans un format : usage, attaques, objets, talents, coéquipiers."""
+    if not format:  # par défaut : le format courant, comme le créateur d'équipe
+        formats = api_get("/api/formats")
+        format = formats[0]["code"] if formats else ""
+    ctx = {"name": name, "format": format, "p": None, "labels": STATS_FR}
+    try:
+        q = urlencode({"format": format})
+        ctx["p"] = api_get(f"/api/stats/pokemon/{quote(name, safe='')}?{q}")
+    except HTTPException as e:
+        if e.status_code != 404:
+            raise
+        return templates.TemplateResponse(request, "pokemon.html", ctx, status_code=404)
+    return templates.TemplateResponse(request, "pokemon.html", ctx)
 
 
 def builder_page(request: Request, fmt: str | None, chosen: list[str], **extra):

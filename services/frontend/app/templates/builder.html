@@ -1,74 +1,82 @@
 {% extends "base.html" %}
 {% block title %}Créer une équipe{% endblock %}
 {% macro pct(r) %}{% if r.winrate is not none %}{{ "%.1f" | format(r.winrate * 100) }} %{% else %}-{% endif %}{% endmacro %}
+{% macro rate(r) %}<td class="num strong rate{% if r.winrate is not none and r.winrate < 0.5 %} low{% endif %}" style="--w: {{ ((r.winrate or 0) * 100) | round(1) }}">{{ pct(r) }}</td>{% endmacro %}
 {% block content %}
 <h1>Créer une équipe</h1>
 {% if not formats %}
-<p>Aucun tournoi en base : lancer le scraper d'abord.</p>
+<p class="panel">Aucun tournoi en base : lancer le scraper d'abord.</p>
 {% else %}
+<p class="lead">Choisir jusqu'à six Pokémon parmi ceux joués dans le format pour voir leurs statistiques et leurs winrates.</p>
 {% if saved %}<p class="ok" role="status">Équipe enregistrée.</p>{% endif %}
-<form method="get" action="/builder">
-  <div class="stack">
+<form method="get" action="/builder" class="panel">
+  <div class="toolbar">
     <label>Format
       <select name="format">
       {% for f in formats %}<option value="{{ f.code }}"{% if f.code == format %} selected{% endif %}>{{ f.code }} ({{ f.tournaments }} tournois)</option>{% endfor %}
       </select>
     </label>
+    <p class="meta">{{ legal | length }} Pokémon légaux : ceux joués dans les tournois scrapés de ce format.</p>
   </div>
-  <p class="meta">{{ legal | length }} Pokémon légaux : ceux joués dans les tournois scrapés de ce format.</p>
-  <div class="team">
+  <div class="slots">
   {% for i in range(size) %}
     <select name="p" aria-label="Pokémon {{ i + 1 }}">
-      <option value="">-</option>
+      <option value="">Pokémon {{ i + 1 }}</option>
       {% for name in legal %}<option{% if chosen[i] == name %} selected{% endif %}>{{ name }}</option>{% endfor %}
     </select>
   {% endfor %}
   </div>
-  <p><button>Voir les statistiques</button></p>
+  <button>Voir les statistiques</button>
 </form>
 
 {% if stats is defined %}
 <h2>Statistiques de base</h2>
+<div class="scroll">
 <table>
-  <thead><tr><th>Pokémon</th><th>Types</th><th>PV</th><th>Att.</th><th>Déf.</th><th>Att. Spé.</th><th>Déf. Spé.</th><th>Vit.</th><th>Total</th></tr></thead>
+  <thead><tr><th>Pokémon</th><th>Types</th><th class="num">PV</th><th class="num">Att.</th><th class="num">Déf.</th><th class="num">Att. Spé.</th><th class="num">Déf. Spé.</th><th class="num">Vit.</th><th class="num">Total</th></tr></thead>
   <tbody>
   {% for name in chosen %}{% set p = info.get(name, {}) %}
     <tr>
-      <td>{% if p.sprite %}<img class="sprite" src="{{ p.sprite }}" alt="" width="48" height="48">{% endif %}{{ name }}</td>
-      <td>{% for ty in p.types or [] %}<span class="type">{{ ty | type_fr }}</span>{% endfor %}</td>
-      {% if p.stats %}{% for v in p.stats.values() %}<td class="num">{{ v }}</td>{% endfor %}<td class="num">{{ p.stats.values() | sum }}</td>
+      <td><span class="mon-name">{% if p.sprite %}<img class="sprite" src="{{ p.sprite }}" alt="" width="40" height="40">{% endif %}<a href="/pokemon/{{ name | urlencode }}?format={{ format | urlencode }}">{{ name }}</a></span></td>
+      <td><div class="types">{% for ty in p.types or [] %}<span class="type t-{{ ty }}">{{ ty | type_fr }}</span>{% endfor %}</div></td>
+      {% if p.stats %}{% for v in p.stats.values() %}<td class="num stat" style="--v: {{ v | int }}">{{ v }}</td>{% endfor %}<td class="num strong">{{ p.stats.values() | sum }}</td>
       {% else %}<td colspan="7" class="meta">pas encore chargées depuis PokéAPI</td>{% endif %}
     </tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
 <h2>Winrate de chaque Pokémon</h2>
+<div class="scroll">
 <table>
-  <thead><tr><th>Pokémon</th><th>Équipes</th><th>Bilan</th><th>Winrate</th><th>Matchups les plus fréquents</th></tr></thead>
+  <thead><tr><th>Pokémon</th><th class="num">Équipes</th><th class="num">Bilan</th><th class="num">Winrate</th><th>Matchups les plus fréquents</th></tr></thead>
   <tbody>
   {% for r in stats %}
     <tr>
-      <td>{{ r.pokemon }}</td><td>{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td><td>{{ pct(r) }}</td>
-      <td>{% for m in matchups[r.pokemon] %}{{ m.opponent }} {{ pct(m) }} ({{ m.games }}){% if not loop.last %}, {% endif %}{% endfor %}</td>
+      <td class="strong">{{ r.pokemon }}</td><td class="num">{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td>{{ rate(r) }}
+      <td><div class="matchups">{% for m in matchups[r.pokemon] %}<span>{{ m.opponent }} {{ pct(m) }} ({{ m.games }})</span>{% else %}<span class="meta">aucun</span>{% endfor %}</div></td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
 <h2>Winrate des paires choisies</h2>
 {% if pairs %}
+<div class="scroll">
 <table>
-  <thead><tr><th>Paire</th><th>Équipes</th><th>Bilan</th><th>Winrate</th></tr></thead>
+  <thead><tr><th>Paire</th><th class="num">Équipes</th><th class="num">Bilan</th><th class="num">Winrate</th></tr></thead>
   <tbody>
   {% for r in pairs %}
-    <tr><td>{{ r.pokemon1 }} + {{ r.pokemon2 }}</td><td>{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td><td>{{ pct(r) }}</td></tr>
+    <tr><td>{{ r.pokemon1 }} + {{ r.pokemon2 }}</td><td class="num">{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td>{{ rate(r) }}</tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}<p class="meta">Aucune équipe n'a joué ces Pokémon ensemble.</p>{% endif %}
-<p class="meta">Winrate = victoires / (victoires + défaites) des joueurs de tous les tournois scrapés du format. Matchups : matchs dont les deux équipes sont connues.</p>
+<p class="meta">Winrate = victoires / (victoires + défaites) des joueurs de tous les tournois scrapés du format. Matchups : matchs dont les deux équipes sont connues, avec le nombre de matchs entre parenthèses.</p>
 
 {% if teams is not none %}
-<form method="post" action="/builder/save" class="stack">
+<form method="post" action="/builder/save" class="save">
   <input type="hidden" name="format" value="{{ format }}">
   {% for p in chosen %}<input type="hidden" name="p" value="{{ p }}">{% endfor %}
   <label>Nom de l'équipe <input name="name" required maxlength="100"></label>
@@ -81,9 +89,9 @@
 
 {% if teams %}
 <h2>Mes équipes</h2>
-<ul>
+<ul class="my-teams">
 {% for t in teams %}
-  <li><a href="/builder?{{ t.query }}">{{ t.name }}</a> ({{ t.format }}) : {{ t.pokemon | join(", ") }}</li>
+  <li><a href="/builder?{{ t.query }}" class="strong">{{ t.name }}</a> <span class="tag">{{ t.format }}</span> <span class="meta">{{ t.pokemon | join(", ") }}</span></li>
 {% endfor %}
 </ul>
 {% endif %}
