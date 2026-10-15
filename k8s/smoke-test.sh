@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Vérifie un déploiement de k8s/ sur le cluster visé par kubectl (minikube, kind en CI, GKE) :
-# pods prêts, gateway en HTTPS, /internal/ fermé, NetworkPolicy et droits des comptes de service.
+# pods prêts, gateway en HTTPS, /internal/ fermé, NetworkPolicy, droits des comptes de service, Pod Security.
 # Prérequis : kubectl apply -k k8s/ fait, ingress-nginx installé. Pas besoin de /etc/hosts ni de tunnel.
 # Usage : k8s/smoke-test.sh
 set -euo pipefail
@@ -39,8 +39,11 @@ connect() { # connect <déploiement> <hôte> <port>
   fi
 }
 
+# rollout status attend aussi l'arrêt des anciens pods (« available » est déjà vrai pendant une mise à jour).
 echo "Attente des déploiements..."
-kubectl -n "$NS" wait --for=condition=available deployment --all --timeout=300s >/dev/null
+for deployment in $(kubectl -n "$NS" get deployment -o name); do
+  kubectl -n "$NS" rollout status "$deployment" --timeout=300s >/dev/null
+done
 
 kubectl -n ingress-nginx port-forward svc/ingress-nginx-controller \
   "$HTTPS_PORT:443" "$HTTP_PORT:80" >/dev/null 2>&1 &
@@ -77,6 +80,11 @@ done
 for d in frontend tournament-service user-service; do
   check "$d tourne en nobody" 65534 "$(kubectl -n "$NS" exec "deploy/$d" -c "$d" -- id -u)"
 done
+check "mysql tourne sous l'utilisateur mysql" 999 "$(kubectl -n "$NS" exec deploy/mysql -c mysql -- id -u)"
+# Pod Security « restricted » : un pod sans securityContext (root possible) est refusé par l'API.
+psa=$(kubectl -n "$NS" run psa-test --image=busybox --restart=Never --dry-run=server -- true 2>&1 || true)
+check "pod non conforme refusé par Pod Security" refusé \
+  "$(grep -q 'violates PodSecurity' <<<"$psa" && echo refusé || echo accepté)"
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures vérification(s) en échec"

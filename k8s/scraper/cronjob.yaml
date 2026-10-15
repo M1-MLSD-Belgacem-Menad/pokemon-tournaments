@@ -27,7 +27,12 @@ spec:
               image: pokemon-scraper  # compte et version : k8s/kustomization.yaml
               securityContext:
                 allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
                 capabilities: { drop: [ALL] }
+              # Mesures sur minikube avec 25 tournois (non mesuré : marge pour les gros tournois) ; limite mémoire autour de 2,5 fois le pic.
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { cpu: 500m, memory: 256Mi }
               env:
                 # Appel par le nom DNS interne du Service, sans passer par l'Ingress.
                 - name: TOURNAMENT_API_URL
