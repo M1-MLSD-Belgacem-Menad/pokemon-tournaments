@@ -120,6 +120,16 @@ def test_forme_inconnue_pas_remplacee_par_l_espece(api, monkeypatch):
     assert scraper.fetch_pokemon("Inconnu Rotom") is None
 
 
+def test_attaque_de_statut_avec_puissance_zero(api, monkeypatch):
+    # PokéAPI donne power = 0 (et non null) pour Dragon Cheer : envoyé tel quel, tout le lot était refusé.
+    monkeypatch.setitem(
+        POKEAPI,
+        "move/dragon-cheer",
+        {"type": {"name": "dragon"}, "damage_class": {"name": "status"}, "power": 0},
+    )
+    assert scraper.fetch_move("Dragon Cheer")["power"] is None
+
+
 @pytest.mark.parametrize(
     "sprite",
     [None, "https://exemple.fr/1.png", scraper.POKEAPI + "/../x.png"],

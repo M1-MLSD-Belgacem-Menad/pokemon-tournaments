@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Binôme | Menad Acheraiou, **[À compléter : second membre]** |
+| Binôme | Menad Acheraiou, Belgacem Smaali |
 | Formation | Master 1 MLSD, Programmation distribuée |
 | Dépôt GitHub | https://github.com/MenadAcheraiou/pokemon-tournaments |
 | Images Docker Hub | `menadacheraiou/pokemon-tournament`, `pokemon-user`, `pokemon-frontend`, `pokemon-scraper` (version du tag Git, par exemple `0.6.0`) |
