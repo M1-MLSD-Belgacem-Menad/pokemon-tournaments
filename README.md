@@ -239,4 +239,4 @@ Reste ouvert : le choix du site à scraper (traité à part) et le format du rap
 
 ## Auteurs
 
-À compléter (binôme).
+Menad Acheraiou et Belgacem Smaali (binôme, Master 1 MLSD).
