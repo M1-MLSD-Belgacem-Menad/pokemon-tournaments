@@ -147,3 +147,44 @@ def test_local_formats_are_not_listed(client, data):
     }
     client.post("/api/tournaments", json=local, headers=auth())
     assert client.get("/api/formats").json()[0]["code"] == "F1"
+
+
+def test_pokemon_page(client, db):
+    t = tournament("https://x/page")
+    a, b = t["standings"][0]["team"], t["standings"][1]["team"]  # a [X, Y], b [X, Z]
+    a[0] |= {"item": "I1", "ability": "A1", "moves": ["M1", "M2"]}
+    b[0] |= {
+        "item": "I2",
+        "ability": "A1",
+        "moves": ["M1"],
+    }  # même part : ordre alphabétique
+    client.post("/internal/import", json=t)
+    page = client.get("/api/stats/pokemon/x", params={"format": "F1"}).json()
+    assert (page["name"], page["teams"], page["usage"], page["winrate"]) == (
+        "X",
+        2,
+        0.5,  # 2 équipes sur 4
+        0.8333,
+    )
+    assert (page["types"], page["stats"], page["sprite"]) == ([], None, None)
+    share = {
+        k: [(r["name"], r["share"]) for r in page[k]]
+        for k in ("abilities", "items", "moves")
+    }
+    assert share == {
+        "abilities": [("A1", 1.0)],
+        "items": [("I1", 0.5), ("I2", 0.5)],
+        "moves": [("M1", 1.0), ("M2", 0.5)],
+    }
+    assert page["teammates"] == [
+        {"name": "Y", "share": 0.5, "sprite": None},
+        {"name": "Z", "share": 0.5, "sprite": None},
+    ]
+
+
+@pytest.mark.parametrize("name,fmt", [("X", "F2"), ("Inconnu", "F1")])
+def test_pokemon_page_not_played_404(client, data, name, fmt):
+    assert (
+        client.get(f"/api/stats/pokemon/{name}", params={"format": fmt}).status_code
+        == 404
+    )
