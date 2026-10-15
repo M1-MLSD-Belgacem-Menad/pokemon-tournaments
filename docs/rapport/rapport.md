@@ -96,14 +96,40 @@ Chaque Pokémon montre son objet, son talent, ses types et ses attaques (type, c
 
 ![Créateur d'équipe](etape10-createur-equipe.png)
 
-### Kubernetes **[À compléter]**
+### Kubernetes (minikube)
 
-À prendre sur le PC de Menad :
+Déployé le 15 octobre en suivant le README, sur un minikube avec Calico (qui applique les NetworkPolicy) et l'addon Ingress. Les images ont été construites dans minikube (`minikube image build`) en attendant leur publication sur Docker Hub.
 
-- `kubectl -n pokemon get pods,svc,ingress,cronjob` sur minikube ;
-- l'application ouverte sur https://pokemon.local ;
-- les vérifications de sécurité du README (frontend qui ne joint pas MySQL, `kubectl auth can-i` à « no ») ;
-- l'application servie depuis GKE, avec l'adresse de l'équilibreur de charge.
+![Ressources du namespace pokemon](etape3-minikube-pods.png)
+
+Tous les pods tournent sans redémarrage, MySQL garde ses données sur un volume persistant, la gateway répond sur `pokemon.local` en HTTP et HTTPS, et le scraper tourne chaque jour à 6 h (le pod `scraper-manuel` est un lancement à la main, qui a importé 25 tournois par gRPC).
+
+![Liste des tournois sur https://pokemon.local](etape3-minikube-liste.png)
+
+Le navigateur affiche « Non sécurisé » parce que le certificat HTTPS est auto-signé (créé avec openssl, voir le README) : le trafic est bien chiffré, mais aucune autorité ne le garantit.
+
+![Détail d'un tournoi](etape3-minikube-tournoi.png)
+
+![Créateur d'équipe : statistiques de base](etape3-minikube-createur.png)
+
+![Créateur d'équipe : winrates par Pokémon, matchups et paires](etape3-minikube-winrates.png)
+
+Vérifications de sécurité (commandes du README) :
+
+| Vérification | Résultat |
+|---|---|
+| Le frontend joint MySQL (3306) | Refusé : `TimeoutError` |
+| Le `tournament-service` joint MySQL | Autorisé |
+| Le frontend joint le port gRPC du `tournament-service` (50051) | Refusé : `TimeoutError` |
+| `kubectl auth can-i` pour les comptes de service du frontend et du `tournament-service` | `no` |
+| Utilisateur des conteneurs | `nobody` (uid 65534), aucun jeton de compte de service monté |
+| `POST https://pokemon.local/internal/import` | 404 |
+| `http://pokemon.local/` | Redirigé vers HTTPS (308) |
+| Suppression du pod MySQL | 25 tournois avant, 25 après |
+
+### GKE **[À compléter]**
+
+L'application servie depuis GKE, avec l'adresse de l'équilibreur de charge.
 
 ## 6. Qualité et tests
 
@@ -113,7 +139,7 @@ Chaque Pokémon montre son objet, son talent, ses types et ses attaques (type, c
   - `terraform fmt` et `validate` ;
   - tests des quatre services, sur une vraie base MySQL jetable ;
   - construction des quatre images.
-- **135 tests** au 14 octobre : 61 pour le `tournament-service`, 20 pour le `user-service`, 27 pour le scraper, 27 pour le frontend. Le scraper n'appelle jamais les vrais sites pendant les tests. Il utilise des réponses enregistrées de Limitless et de PokéAPI.
+- **149 tests** au 15 octobre : 66 pour le `tournament-service`, 20 pour le `user-service`, 28 pour le scraper, 35 pour le frontend. Le scraper n'appelle jamais les vrais sites pendant les tests. Il utilise des réponses enregistrées de Limitless et de PokéAPI.
 - **Une PR par étape**, liée à son issue, relue (revue de code) avant fusion.
 - **Vérification « comme le correcteur »** : clone propre, tests verts, `docker compose up --build`, import d'un tournoi par gRPC, pages, inscription et connexion vérifiées (cases cochées dans [`docs/05-checklist-conformite.md`](../05-checklist-conformite.md)).
 
