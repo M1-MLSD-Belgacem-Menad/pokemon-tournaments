@@ -205,7 +205,7 @@ kubectl config use-context minikube   # kubectl vise de nouveau minikube
 
 ## Publier une version
 
-Au push d'un tag `v*`, si le lint et les tests passent, la CI construit les images et les publie sur Docker Hub avec la version du tag (`v0.1.0` donne `pokemon-tournament:0.1.0`). Il faut une fois les secrets GitHub `DOCKERHUB_USERNAME` (le compte Docker Hub en minuscules, le même que dans `k8s/kustomization.yaml`) et `DOCKERHUB_TOKEN` (*Settings > Secrets and variables > Actions*).
+Au push d'un tag `v*`, si le lint et les tests passent, la CI construit les images et les publie sur Docker Hub avec la version du tag (`v0.1.0` donne `pokemon-tournament:0.1.0`). Chaque image existe en `amd64` (PC, GKE) et en `arm64` (Mac Apple Silicon) : Docker et Kubernetes tirent automatiquement la variante du processeur. Il faut une fois les secrets GitHub `DOCKERHUB_USERNAME` (le compte Docker Hub en minuscules, le même que dans `k8s/kustomization.yaml`) et `DOCKERHUB_TOKEN` (*Settings > Secrets and variables > Actions*).
 
 ```bash
 git tag v0.6.0
