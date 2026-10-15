@@ -138,6 +138,8 @@ def test_detail_affiche_le_classement_et_l_equipe(api):
         "Close Combat</li>" in resp.text
     )  # sans détails tant qu'elle n'est pas enrichie
     assert 'src="https://flagcdn.com/w20/jp.png"' in resp.text
+    assert '<li class="p1">' in resp.text  # médaille d'or du 1er
+    assert '<div class="mon t-normal">' in resp.text  # carte teintée par le 1er type
     assert resp.text.count('class="sprite"') == 1  # Indeedee n'a pas de sprite
 
 
@@ -374,7 +376,7 @@ def stats_api(monkeypatch):
         "http://api/api/formats/F1/legal-pokemon": ["X", "Y", "Z"],
         f"http://api/api/stats/pokemon?{q}": [
             {"pokemon": "X", "teams": 2, "wins": 5, "losses": 1, "winrate": 0.8333},
-            {"pokemon": "Y", "teams": 2, "wins": 4, "losses": 2, "winrate": 0.6667},
+            {"pokemon": "Y", "teams": 2, "wins": 2, "losses": 3, "winrate": 0.4},
         ],
         f"http://api/api/stats/combinations?{q}": [
             {
@@ -422,6 +424,10 @@ def test_builder_affiche_les_winrates(stats_api):
     )
     assert "83.3 %" in resp.text and "X + Y" in resp.text and "100.0 %" in resp.text
     assert "Z 100.0 % (5)" in resp.text  # matchup
+    assert '<td class="num strong rate" style="--w: 83.3">83.3 %</td>' in resp.text
+    assert (
+        '<td class="num strong rate low" style="--w: 40.0">40.0 %</td>' in resp.text
+    )  # < 50 % : jauge rouge
     assert '<span class="type t-water">Eau</span>' in resp.text
     assert '<td class="num strong">21</td>' in resp.text  # total des statistiques de X
     assert "pas encore chargées depuis PokéAPI" in resp.text  # Y

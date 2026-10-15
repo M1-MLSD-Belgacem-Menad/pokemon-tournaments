@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Créer une équipe{% endblock %}
 {% macro pct(r) %}{% if r.winrate is not none %}{{ "%.1f" | format(r.winrate * 100) }} %{% else %}-{% endif %}{% endmacro %}
+{% macro rate(r) %}<td class="num strong rate{% if r.winrate is not none and r.winrate < 0.5 %} low{% endif %}" style="--w: {{ ((r.winrate or 0) * 100) | round(1) }}">{{ pct(r) }}</td>{% endmacro %}
 {% block content %}
 <h1>Créer une équipe</h1>
 {% if not formats %}
@@ -52,7 +53,7 @@
   <tbody>
   {% for r in stats %}
     <tr>
-      <td class="strong">{{ r.pokemon }}</td><td class="num">{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td><td class="num strong">{{ pct(r) }}</td>
+      <td class="strong">{{ r.pokemon }}</td><td class="num">{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td>{{ rate(r) }}
       <td><div class="matchups">{% for m in matchups[r.pokemon] %}<span>{{ m.opponent }} {{ pct(m) }} ({{ m.games }})</span>{% else %}<span class="meta">aucun</span>{% endfor %}</div></td>
     </tr>
   {% endfor %}
@@ -66,7 +67,7 @@
   <thead><tr><th>Paire</th><th class="num">Équipes</th><th class="num">Bilan</th><th class="num">Winrate</th></tr></thead>
   <tbody>
   {% for r in pairs %}
-    <tr><td>{{ r.pokemon1 }} + {{ r.pokemon2 }}</td><td class="num">{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td><td class="num strong">{{ pct(r) }}</td></tr>
+    <tr><td>{{ r.pokemon1 }} + {{ r.pokemon2 }}</td><td class="num">{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td>{{ rate(r) }}</tr>
   {% endfor %}
   </tbody>
 </table>
