@@ -177,13 +177,13 @@ fieldset label { flex-direction: row; align-items: center; gap: 0.5rem; font-wei
 .toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; }
 .toolbar label { width: 16rem; max-width: 100%; }
 .mon-name { display: flex; align-items: center; gap: 0.4rem; font-weight: 600; white-space: nowrap; }
-/* Petites jauges sous les nombres : statistique de base (sur 255) et winrate (sur 100 %) */
+/* Petites jauges sous les nombres : statistique de base (sur 200) et winrate (sur 100 %) */
 .stat, .rate { position: relative; }
 .stat::after, .rate::after {
   content: ""; position: absolute; right: 0.8rem; bottom: 0.3rem; width: var(--len); height: 4px; border-radius: 2px;
   background: linear-gradient(90deg, var(--fill) var(--pct), var(--line) 0);
 }
-.stat { --len: 3rem; --fill: var(--muted); --pct: calc(var(--v) * 100% / 255); }
+.stat { --len: 3rem; --fill: var(--muted); --pct: min(100%, calc(var(--v) * 100% / 200)); } /* 200 et plus = jauge pleine */
 .rate { --len: 3.5rem; --fill: var(--win); --pct: calc(var(--w) * 1%); }
 .rate.low { --fill: var(--accent); } /* sous 50 % */
 .matchups { display: flex; flex-wrap: wrap; gap: 0.3rem; }
