@@ -228,6 +228,7 @@ TOP = {
 def pokemon_page(name: str, conn: Conn, format: str) -> dict:
     """Fiche d'un Pokémon dans un format : usage, winrate, talents, objets, attaques et coéquipiers.
 
+    `teams` = équipes qui le jouent, `format_teams` = équipes du format, `usage` = leur rapport.
     `share` = part des équipes qui jouent ce Pokémon (de 0 à 1) ; les 10 premiers de chaque liste.
     """
     # ponytail: 7 petites requêtes qui refont le CTE ; tout lire en une fois si la fiche devient lente.
@@ -244,7 +245,8 @@ def pokemon_page(name: str, conn: Conn, format: str) -> dict:
         cur.execute(
             "SELECT COUNT(DISTINCT tp.standing_id) AS n" + FORMAT_TEAMS, (format,)
         )
-        page["usage"] = round(teams / cur.fetchone()["n"], 4)
+        page["format_teams"] = cur.fetchone()["n"]
+        page["usage"] = round(teams / page["format_teams"], 4)
         for key, sql in TOP.items():
             cur.execute(MINE + sql + " ORDER BY n DESC, name LIMIT 10", (format, name))
             page[key] = rows = cur.fetchall()

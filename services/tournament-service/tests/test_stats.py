@@ -160,12 +160,8 @@ def test_pokemon_page(client, db):
     }  # même part : ordre alphabétique
     client.post("/internal/import", json=t)
     page = client.get("/api/stats/pokemon/x", params={"format": "F1"}).json()
-    assert (page["name"], page["teams"], page["usage"], page["winrate"]) == (
-        "X",
-        2,
-        0.5,  # 2 équipes sur 4
-        0.8333,
-    )
+    got = [page[k] for k in ("name", "teams", "format_teams", "usage", "winrate")]
+    assert got == ["X", 2, 4, 0.5, 0.8333]
     assert (page["types"], page["stats"], page["sprite"]) == ([], None, None)
     share = {
         k: [(r["name"], r["share"]) for r in page[k]]
@@ -180,6 +176,10 @@ def test_pokemon_page(client, db):
         {"name": "Y", "share": 0.5, "sprite": None},
         {"name": "Z", "share": 0.5, "sprite": None},
     ]
+
+
+def test_pokemon_page_requires_format(client, data):
+    assert client.get("/api/stats/pokemon/X").status_code == 422
 
 
 @pytest.mark.parametrize("name,fmt", [("X", "F2"), ("Inconnu", "F1")])
