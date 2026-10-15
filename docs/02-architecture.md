@@ -63,6 +63,7 @@ Préfixes routés par la gateway. Les routes en écriture exigent un jeton.
 | GET | `/api/stats/pokemon` | tournament | Taux d'usage et winrate par Pokémon |
 | GET | `/api/stats/combinations` | tournament | Winrate par combinaison (F-06) |
 | GET | `/api/stats/matchups` | tournament | Winrate par matchup (F-06), si les données de matchs existent |
+| GET | `/api/stats/pokemon/{nom}?format=` | tournament | Fiche d'un Pokémon : usage, winrate, talents, objets, attaques et coéquipiers les plus joués (part des équipes, de 0 à 1) |
 | POST | `/api/teams` | tournament | Enregistrer une équipe construite (étape 3), jeton requis, Pokémon légaux seulement |
 | GET | `/api/teams` | tournament | Équipes de l'utilisateur du jeton |
 | POST | `/internal/import` | tournament | Import d'un tournoi (même code que l'appel gRPC du scraper), pour les essais ; non exposé par la gateway |

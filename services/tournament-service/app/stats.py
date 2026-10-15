@@ -195,6 +195,65 @@ def matchup_stats(
         return [winrate(r) for r in cur.fetchall()]
 
 
+# Équipes du format qui ont un bilan (tournois scrapés) : base de la fiche et de son taux d'usage.
+FORMAT_TEAMS = (
+    " FROM team_pokemon tp JOIN standing s ON s.id = tp.standing_id"
+    " JOIN tournament t ON t.id = s.tournament_id JOIN format f ON f.id = t.format_id"
+    " WHERE f.code = %s AND s.wins IS NOT NULL"
+)
+# Lignes `team_pokemon` du Pokémon demandé dans ces équipes.
+MINE = (
+    "WITH mine AS (SELECT tp.id, tp.standing_id, tp.pokemon_id, tp.item_id, tp.ability_id,"
+    " s.wins, s.losses"
+    + FORMAT_TEAMS
+    + " AND tp.pokemon_id = (SELECT id FROM pokemon WHERE name = %s)) "
+)
+# Par liste de la fiche : nombre d'équipes (pas de lignes) qui ont chaque talent, objet, attaque, coéquipier.
+TOP = {
+    "abilities": "SELECT a.name, COUNT(DISTINCT m.standing_id) AS n FROM mine m"
+    " JOIN ability a ON a.id = m.ability_id GROUP BY a.name",
+    "items": "SELECT i.name, COUNT(DISTINCT m.standing_id) AS n FROM mine m"
+    " JOIN item i ON i.id = m.item_id GROUP BY i.name",
+    "moves": "SELECT mv.name, COUNT(DISTINCT m.standing_id) AS n FROM mine m"
+    " JOIN team_pokemon_move tpm ON tpm.team_pokemon_id = m.id JOIN move mv ON mv.id = tpm.move_id"
+    " GROUP BY mv.name",
+    "teammates": "SELECT pk.name, COUNT(DISTINCT m.standing_id) AS n, ps.sprite_url AS sprite"
+    " FROM mine m JOIN team_pokemon o ON o.standing_id = m.standing_id AND o.pokemon_id <> m.pokemon_id"
+    " JOIN pokemon pk ON pk.id = o.pokemon_id LEFT JOIN pokemon_stats ps ON ps.pokemon_id = pk.id"
+    " GROUP BY pk.name, ps.sprite_url",
+}
+
+
+@router.get("/api/stats/pokemon/{name}")
+def pokemon_page(name: str, conn: Conn, format: str) -> dict:
+    """Fiche d'un Pokémon dans un format : usage, winrate, talents, objets, attaques et coéquipiers.
+
+    `share` = part des équipes qui jouent ce Pokémon (de 0 à 1) ; les 10 premiers de chaque liste.
+    """
+    # ponytail: 7 petites requêtes qui refont le CTE ; tout lire en une fois si la fiche devient lente.
+    with conn.cursor() as cur:
+        cur.execute(
+            MINE + "SELECT COUNT(*) AS teams, SUM(wins) AS wins, SUM(losses) AS losses"
+            " FROM (SELECT DISTINCT standing_id, wins, losses FROM mine) AS t",
+            (format, name),
+        )
+        page = winrate(cur.fetchone())
+        if not page["teams"]:
+            raise HTTPException(404, f"{name} n'a pas été joué en {format}")
+        teams = page["teams"]
+        cur.execute(
+            "SELECT COUNT(DISTINCT tp.standing_id) AS n" + FORMAT_TEAMS, (format,)
+        )
+        page["usage"] = round(teams / cur.fetchone()["n"], 4)
+        for key, sql in TOP.items():
+            cur.execute(MINE + sql + " ORDER BY n DESC, name LIMIT 10", (format, name))
+            page[key] = rows = cur.fetchall()
+            for r in rows:
+                r["share"] = round(r.pop("n") / teams, 4)
+    info = pokemon_info(conn, [name])[0]  # existe : il a été joué
+    return {**info, **page}
+
+
 class SavedTeam(BaseModel):
     name: Name
     format: Name
