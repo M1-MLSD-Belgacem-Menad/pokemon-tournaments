@@ -187,7 +187,7 @@ La gateway : le même contrôleur ingress-nginx que l'addon de minikube, en vers
 
 ```powershell
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
-kubectl -n ingress-nginx wait --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=300s
+kubectl -n ingress-nginx rollout status deployment/ingress-nginx-controller --timeout=300s
 $ip = Invoke-RestMethod https://api.ipify.org
 "spec: {loadBalancerSourceRanges: [$ip/32]}" | Set-Content lb.yaml
 kubectl -n ingress-nginx patch svc ingress-nginx-controller --patch-file lb.yaml

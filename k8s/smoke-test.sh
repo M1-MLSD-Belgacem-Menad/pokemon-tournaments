@@ -45,10 +45,13 @@ for deployment in $(kubectl -n "$NS" get deployment -o name); do
   kubectl -n "$NS" rollout status "$deployment" --timeout=300s >/dev/null
 done
 
+# Sortie du port-forward gardée : affichée en cas d'échec (port déjà pris, connexion perdue...).
+port_forward_log=$(mktemp)
 kubectl -n ingress-nginx port-forward svc/ingress-nginx-controller \
-  "$HTTPS_PORT:443" "$HTTP_PORT:80" >/dev/null 2>&1 &
+  "$HTTPS_PORT:443" "$HTTP_PORT:80" >"$port_forward_log" 2>&1 &
 port_forward=$!
-trap 'kill $port_forward' EXIT
+# Le port-forward peut déjà être mort : son arrêt ne doit pas changer le code de sortie.
+trap 'rm -f "$port_forward_log"; kill "$port_forward" 2>/dev/null || true' EXIT
 # Juste après un déploiement, nginx répond 404 le temps de charger la règle de l'Ingress, puis 503
 # tant qu'il n'a pas les adresses des pods prêts : on attend que les trois services répondent (1 min max).
 for _ in $(seq 30); do
@@ -88,6 +91,8 @@ check "pod non conforme refusé par Pod Security" refusé \
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures vérification(s) en échec"
+  echo "--- sortie du port-forward vers ingress-nginx :"
+  cat "$port_forward_log"
   exit 1
 fi
 echo "Toutes les vérifications passent"

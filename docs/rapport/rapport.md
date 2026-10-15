@@ -122,7 +122,7 @@ Vérifications de sécurité (commandes du README) :
 | Le `tournament-service` joint MySQL | Autorisé |
 | Le frontend joint le port gRPC du `tournament-service` (50051) | Refusé : `TimeoutError` |
 | `kubectl auth can-i` pour les comptes de service du frontend et du `tournament-service` | `no` |
-| Utilisateur des conteneurs | `nobody` (uid 65534), aucun jeton de compte de service monté |
+| Utilisateur des conteneurs | `nobody` (uid 65534), aucun jeton de compte de service monté (MySQL tourne maintenant en `mysql`, uid 999, voir plus bas) |
 | `POST https://pokemon.local/internal/import` | 404 |
 | `http://pokemon.local/` | Redirigé vers HTTPS (308) |
 | Suppression du pod MySQL | 25 tournois avant, 25 après |
@@ -150,7 +150,8 @@ L'application servie depuis GKE, avec l'adresse de l'équilibreur de charge.
 - **Tous les joueurs sont enregistrés, seul le top 16 est affiché** : sinon les winrates ne seraient calculés que sur des joueurs qui ont gagné.
 - **Pokémon légaux** : ceux joués dans les tournois scrapés du format courant. C'est plus simple que de recopier le règlement, et cela suit ses changements.
 - **Sécurité** : pas de service mesh ni de mTLS. Les NetworkPolicy, le HTTPS, Pod Security en profil `restricted`, les conteneurs sans root en lecture seule et les scans Trivy couvrent le palier sans ajouter Istio, trop lourd pour un minikube sur 8 Go. Le gRPC interne n'est pas chiffré, mais seul le scraper peut joindre son port.
-- **Failles des images** : chaque image a une quarantaine de failles HIGH dans les paquets Debian de l'image Python de base, toutes sans correctif au 15 octobre. La CI ne bloque que les failles corrigeables : elle passe au rouge dès qu'un correctif sort, et reconstruire l'image suffit alors.
+- **Failles des images** : chaque image a une quarantaine de failles HIGH dans les paquets Debian de l'image Python de base, toutes sans correctif au 15 octobre. Seules les failles qui ont un correctif comptent. Elles bloquent la publication d'une version, mais pas les PR : l'image Python officielle est souvent reconstruite plusieurs jours après le correctif Debian, et une PR n'y pourrait rien. Une fois l'image de base mise à jour, reconstruire nos images suffit.
+- **Gateway** : ingress-nginx n'est plus maintenu (dépôt archivé, dernière version `controller-v1.15.1` en mars 2026). C'est le seul composant exposé, et il ne recevra plus de correctifs de sécurité. Le remplacer par une implémentation de Gateway API serait la suite logique.
 - **Images externes** : sprites (dépôt GitHub de PokéAPI) et drapeaux (flagcdn.com) sont chargés par le navigateur. Une URL de sprite qui ne vient pas de PokéAPI est refusée.
 
 ## 8. Labs Google **[À compléter]**
