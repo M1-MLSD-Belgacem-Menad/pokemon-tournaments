@@ -3,6 +3,7 @@ import os
 import re
 import urllib.error
 import urllib.request
+from collections import Counter
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote, urlencode, urlsplit
@@ -210,13 +211,27 @@ async def new_tournament(request: Request):
     return page(error_message(body), 422)
 
 
+def usage(standings: list[dict], limit: int = 5) -> dict:
+    """Pokémon les plus joués : part (en %) des équipes connues qui l'alignent."""
+    teams = [s.get("team") for s in standings if s.get("team")]
+    # set : un Pokémon compte une fois par équipe, la part ne dépasse jamais 100 %
+    counts = Counter(name for team in teams for name in {p["name"] for p in team})
+    sprites = {}
+    for p in (p for team in teams for p in team):
+        sprites[p["name"]] = sprites.get(p["name"]) or p.get("sprite")
+    top = [
+        {"name": n, "sprite": sprites[n], "pct": round(100 * c / len(teams))}
+        for n, c in counts.most_common(limit)
+    ]
+    return {"teams": len(teams), "top": top}
+
+
 @app.get("/tournaments/{tournament_id}", response_class=HTMLResponse)
 def tournament(request: Request, tournament_id: int):
     """Détail d'un tournoi : top 16 et équipes (l'API a tous les joueurs, on ne demande que ça)."""
+    t = api_get(f"/api/tournaments/{tournament_id}?top=16")
     return templates.TemplateResponse(
-        request,
-        "tournament.html",
-        {"t": api_get(f"/api/tournaments/{tournament_id}?top=16")},
+        request, "tournament.html", {"t": t, "usage": usage(t["standings"])}
     )
 
 

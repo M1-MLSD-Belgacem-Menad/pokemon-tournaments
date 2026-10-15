@@ -141,6 +141,50 @@ def test_detail_affiche_le_classement_et_l_equipe(api):
     assert '<li class="p1">' in resp.text  # médaille d'or du 1er
     assert '<div class="mon t-normal">' in resp.text  # carte teintée par le 1er type
     assert resp.text.count('class="sprite"') == 1  # Indeedee n'a pas de sprite
+    assert resp.text.count('class="sprite mon-sprite"') == 1  # idem dans le détail
+    assert '<ol class="podium">' in resp.text  # le 1er est mis en avant en carte
+    assert '<ol class="standings">' not in resp.text  # personne d'autre
+    assert (
+        "Les plus joués du top 1" in resp.text and "<strong>100 %</strong>" in resp.text
+    )
+
+
+def test_usage_compte_les_equipes_connues():
+    mon = lambda n: {"name": n, "sprite": None}
+    standings = [
+        {"team": [mon("Incineroar"), mon("Rillaboom")]},
+        {"team": [mon("Incineroar")]},
+        {"team": []},  # équipe non publiée : ignorée
+        {},  # sans clé team
+    ]
+    u = main.usage(standings)
+    assert u["teams"] == 2
+    assert u["top"] == [
+        {"name": "Incineroar", "sprite": None, "pct": 100},
+        {"name": "Rillaboom", "sprite": None, "pct": 50},
+    ]
+    assert main.usage([{"team": []}]) == {"teams": 0, "top": []}
+    # doublon dans une équipe compté une fois ; premier sprite connu conservé
+    doublon = [{"team": [mon("Urshifu") | {"sprite": "u.png"}, mon("Urshifu")]}]
+    assert main.usage(doublon)["top"] == [
+        {"name": "Urshifu", "sprite": "u.png", "pct": 100}
+    ]
+
+
+def test_podium_puis_suite_du_classement(monkeypatch):
+    premier = TOURNAMENT["standings"][0]
+    cinq = [premier | {"placement": i, "player": f"J{i}"} for i in range(1, 5)]
+    abandon = premier | {"placement": None, "player": "Abandon", "team": []}
+    data = TOURNAMENT | {"standings": [*cinq, abandon]}
+    responses = {"http://api/api/tournaments/1?top=16": data}
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
+    html = client.get("/tournaments/1").text
+    podium, suite = html.split('<ol class="standings">')
+    assert all(f"<strong>J{i}</strong>" in podium for i in (1, 2, 3))
+    assert "<strong>J4</strong>" in suite and "<strong>Abandon</strong>" in suite
+    assert '<img class="sprite big"' in podium and "<small>Staraptite</small>" in podium
+    assert '<img class="sprite big"' not in suite  # cartes réservées au podium
+    assert "Les plus joués du top 5 (4 équipes publiées)" in html
 
 
 def test_equipe_absente_est_signalee(monkeypatch):
@@ -151,7 +195,7 @@ def test_equipe_absente_est_signalee(monkeypatch):
     monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
     html = client.get("/tournaments/1").text
     assert "équipe non publiée" in html
-    assert "<details>" not in html  # rien à déplier
+    assert "<details" not in html  # rien à déplier
 
 
 def test_joueur_sans_place_ne_plante_pas(monkeypatch):

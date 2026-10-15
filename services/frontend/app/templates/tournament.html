@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ t.name }}{% endblock %}
-{% macro row(s) %}
+{% macro row(s, card) %}
         <span class="place">{{ s.placement }}</span>
         {% set flag = s.country | flag %}
         <span class="player"><strong>{{ s.player }}</strong>{% if s.country %}<span class="country">{% if flag %}<img class="flag" src="{{ flag }}" alt="" width="16" loading="lazy"> {% endif %}{{ s.country }}</span>{% endif %}</span>
@@ -12,6 +12,40 @@
           <em class="meta">équipe non publiée par l'organisateur</em>
         {% endfor %}
         </span>
+        {% if card and s.team %}
+        <span class="cards">
+        {% for p in s.team %}
+          <span>{% if p.sprite %}<img class="sprite big" src="{{ p.sprite }}" alt="" width="56" height="56" loading="lazy">{% endif %}<strong>{{ p.name }}</strong>{% if p.item %}<small>{{ p.item }}</small>{% endif %}</span>
+        {% endfor %}
+        </span>
+        {% endif %}
+{% endmacro %}
+{% macro player(s, card=false) %}
+  <li{% if s.placement and s.placement <= 3 %} class="p{{ s.placement }}"{% endif %}>
+  {% if s.team %}
+    {# name : un seul joueur déplié à la fois (navigateurs récents) #}
+    <details name="joueur">
+      <summary>{{ row(s, card) }}</summary>
+      <div class="sets">
+      {% for p in s.team %}
+        <div class="mon{% if p.types %} t-{{ p.types[0] }}{% endif %}">
+          {% if p.sprite %}<img class="sprite mon-sprite" src="{{ p.sprite }}" alt="" width="64" height="64" loading="lazy">{% endif %}
+          <div class="mon-body">
+          <div class="mon-head"><strong>{{ p.name }}</strong>{% if p.item %} <span class="item">@ {{ p.item }}</span>{% endif %}</div>
+          {% if p.types %}<div class="types">{% for ty in p.types %}<span class="type t-{{ ty }}">{{ ty | type_fr }}</span>{% endfor %}</div>{% endif %}
+          {% if p.ability %}<div class="ability">{{ p.ability }}</div>{% endif %}
+          {% if p.moves %}<ul class="moves">{% for m in p.moves %}
+            <li>{{ m.name }}{% if m.type %} <span class="meta">({{ m.type | type_fr }}, {{ m.category | category_fr }}{% if m.power %}, {{ m.power }}{% endif %})</span>{% endif %}</li>
+          {% endfor %}</ul>{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+      </div>
+    </details>
+  {% else %}
+    <div class="row">{{ row(s, card) }}</div>
+  {% endif %}
+  </li>
 {% endmacro %}
 {% block content %}
 <h1>{{ t.name }}</h1>
@@ -19,30 +53,17 @@
   {{ t.date }} · <span class="tag">{{ t.format }}</span>{% if t.player_count %} · {{ t.player_count }} joueurs{% endif %}
   {% if t.source_url %} · <a href="{{ t.source_url }}">voir la source</a>{% endif %}
 </p>
-<p class="meta">Cliquer sur un joueur pour voir les objets, talents et attaques de son équipe.</p>
-<ol class="standings">
-{% for s in t.standings %}
-  <li{% if s.placement and s.placement <= 3 %} class="p{{ s.placement }}"{% endif %}>
-  {% if s.team %}
-    <details>
-      <summary>{{ row(s) }}</summary>
-      <div class="sets">
-      {% for p in s.team %}
-        <div class="mon{% if p.types %} t-{{ p.types[0] }}{% endif %}">
-          <div class="mon-head"><strong>{{ p.name }}</strong>{% if p.item %} <span class="item">@ {{ p.item }}</span>{% endif %}</div>
-          {% if p.types %}<div class="types">{% for ty in p.types %}<span class="type t-{{ ty }}">{{ ty | type_fr }}</span>{% endfor %}</div>{% endif %}
-          {% if p.ability %}<div class="ability">{{ p.ability }}</div>{% endif %}
-          {% if p.moves %}<ul class="moves">{% for m in p.moves %}
-            <li>{{ m.name }}{% if m.type %} <span class="meta">({{ m.type | type_fr }}, {{ m.category | category_fr }}{% if m.power %}, {{ m.power }}{% endif %})</span>{% endif %}</li>
-          {% endfor %}</ul>{% endif %}
-        </div>
-      {% endfor %}
-      </div>
-    </details>
-  {% else %}
-    <div class="row">{{ row(s) }}</div>
-  {% endif %}
-  </li>
-{% endfor %}
-</ol>
+{% if usage.top %}
+<p class="usage">
+  <span class="usage-title">Les plus joués du top {{ t.standings | length }}{% if usage.teams < t.standings | length %} ({{ usage.teams }} équipes publiées){% endif %}</span>
+  {% for u in usage.top %}<span>{% if u.sprite %}<img class="mini" src="{{ u.sprite }}" alt="" width="28" height="28" loading="lazy">{% endif %}{{ u.name }} <strong>{{ u.pct }} %</strong></span>{% endfor %}
+</p>
+{% endif %}
+{% set podium = t.standings | selectattr("placement", "in", [1, 2, 3]) | list %}
+{% set rest = t.standings | rejectattr("placement", "in", [1, 2, 3]) | list %}
+{% if podium %}<p class="meta hint">Cliquer sur un joueur pour voir le détail de son équipe, puis à nouveau pour revenir au podium.</p>{% endif %}
+<div class="results">
+  {% if podium %}<ol class="podium">{% for s in podium %}{{ player(s, true) }}{% endfor %}</ol>{% endif %}
+  {% if rest %}<ol class="standings">{% for s in rest %}{{ player(s) }}{% endfor %}</ol>{% endif %}
+</div>
 {% endblock %}
