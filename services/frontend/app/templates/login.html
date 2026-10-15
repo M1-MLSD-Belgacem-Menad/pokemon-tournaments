@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Connexion{% endblock %}
 {% block content %}
+<div class="auth panel">
 <h1>Connexion</h1>
 <form method="post" action="/login" class="stack">
   <label>Nom d'utilisateur <input name="username" value="{{ username or '' }}" required autocomplete="username"></label>
   <label>Mot de passe <input name="password" type="password" required autocomplete="current-password"></label>
   <button>Se connecter</button>
 </form>
-<p>Pas encore de compte ? <a href="/register">Inscription</a></p>
+<p class="meta">Pas encore de compte ? <a href="/register">Inscription</a></p>
+</div>
 {% endblock %}

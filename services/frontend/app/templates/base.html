@@ -7,22 +7,28 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header>
-    <a href="/">Tournois Pokémon VGC</a>
-    <nav>
-      <a href="/builder">Créer une équipe</a>
-    {% if request.cookies.token %}
-      <a href="/tournaments/new">Saisir un tournoi</a>
-      <form method="post" action="/logout"><button>Déconnexion</button></form>
-    {% else %}
-      <a href="/login">Connexion</a>
-      <a href="/register">Inscription</a>
-    {% endif %}
-    </nav>
+  {% set path = request.url.path %}
+  {% macro link(href, label, current=false) %}<a href="{{ href }}"{% if current or path == href %} aria-current="page"{% endif %}>{{ label }}</a>{% endmacro %}
+  <header class="site-header">
+    <div class="inner">
+      <a class="brand" href="/">Tournois VGC</a>
+      <nav>
+        {{ link("/", "Tournois", path.startswith("/tournaments/") and path != "/tournaments/new") }}
+        {{ link("/builder", "Créer une équipe") }}
+      {% if request.cookies.token %}
+        {{ link("/tournaments/new", "Saisir un tournoi") }}
+        <form method="post" action="/logout"><button class="quiet">Déconnexion</button></form>
+      {% else %}
+        {{ link("/login", "Connexion") }}
+        {{ link("/register", "Inscription") }}
+      {% endif %}
+      </nav>
+    </div>
   </header>
-  <main>
+  <main class="inner">
     {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
     {% block content %}{% endblock %}
   </main>
+  <footer class="site-footer inner">Tournois importés depuis Limitless · Données Pokémon : PokéAPI</footer>
 </body>
 </html>
