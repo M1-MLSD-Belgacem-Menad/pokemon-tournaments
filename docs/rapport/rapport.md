@@ -135,11 +135,11 @@ L'application servie depuis GKE, avec l'adresse de l'équilibreur de charge.
 
 - **CI GitHub Actions** sur chaque PR :
   - lint et format avec ruff ;
-  - `kubectl kustomize` ;
+  - `kubectl kustomize`, puis Trivy sur les manifestes rendus (aucune alerte HIGH ou CRITICAL) ;
   - `terraform fmt` et `validate` ;
   - tests des quatre services, sur une vraie base MySQL jetable ;
-  - construction des quatre images ;
-  - déploiement complet sur un cluster kind jetable, vérifié par `k8s/smoke-test.sh` (gateway en HTTPS, `/internal/` fermé, NetworkPolicy, droits des comptes de service, conteneurs non-root).
+  - construction des quatre images, scannées par Trivy (aucune faille HIGH ou CRITICAL qui a un correctif) ;
+  - déploiement complet sur un cluster kind jetable, vérifié par `k8s/smoke-test.sh` (gateway en HTTPS, `/internal/` fermé, NetworkPolicy, droits des comptes de service, conteneurs non-root, Pod Security).
 - **149 tests** au 15 octobre : 66 pour le `tournament-service`, 20 pour le `user-service`, 28 pour le scraper, 35 pour le frontend. Le scraper n'appelle jamais les vrais sites pendant les tests. Il utilise des réponses enregistrées de Limitless et de PokéAPI.
 - **Une PR par étape**, liée à son issue, relue (revue de code) avant fusion.
 - **Vérification « comme le correcteur »** : clone propre, tests verts, `docker compose up --build`, import d'un tournoi par gRPC, pages, inscription et connexion vérifiées (cases cochées dans [`docs/05-checklist-conformite.md`](../05-checklist-conformite.md)).
@@ -149,7 +149,8 @@ L'application servie depuis GKE, avec l'adresse de l'équilibreur de charge.
 - **Source des tournois** : l'API JSON publique de Limitless, plus stable que du HTML. Une seconde de pause entre deux requêtes et un `User-Agent` explicite.
 - **Tous les joueurs sont enregistrés, seul le top 16 est affiché** : sinon les winrates ne seraient calculés que sur des joueurs qui ont gagné.
 - **Pokémon légaux** : ceux joués dans les tournois scrapés du format courant. C'est plus simple que de recopier le règlement, et cela suit ses changements.
-- **Sécurité** : pas de service mesh ni de mTLS. Les NetworkPolicy et le HTTPS couvrent le palier sans ajouter Istio. Le gRPC interne n'est pas chiffré, mais seul le scraper peut joindre son port.
+- **Sécurité** : pas de service mesh ni de mTLS. Les NetworkPolicy, le HTTPS, Pod Security en profil `restricted`, les conteneurs sans root en lecture seule et les scans Trivy couvrent le palier sans ajouter Istio, trop lourd pour un minikube sur 8 Go. Le gRPC interne n'est pas chiffré, mais seul le scraper peut joindre son port.
+- **Failles des images** : chaque image a une quarantaine de failles HIGH dans les paquets Debian de l'image Python de base, toutes sans correctif au 15 octobre. La CI ne bloque que les failles corrigeables : elle passe au rouge dès qu'un correctif sort, et reconstruire l'image suffit alors.
 - **Images externes** : sprites (dépôt GitHub de PokéAPI) et drapeaux (flagcdn.com) sont chargés par le navigateur. Une URL de sprite qui ne vient pas de PokéAPI est refusée.
 
 ## 8. Labs Google **[À compléter]**

@@ -125,9 +125,12 @@ Pour tester des images construites en local sans passer par Docker Hub : `miniku
 
 ### Sécurité du cluster
 
-- Pods sans root (`runAsNonRoot`, utilisateur `nobody`), sans élévation de privilèges ni capacités Linux. MySQL fait exception : son image démarre en root avant de passer à l'utilisateur `mysql`.
+- Pod Security Admission en profil `restricted` sur le namespace (`k8s/namespace.yaml`) : l'API refuse tout pod qui tournerait en root, avec élévation de privilèges, capacités Linux ou sans profil seccomp.
+- Tous les conteneurs sans root (`nobody`, et `mysql` pour MySQL), avec un système de fichiers racine en lecture seule. MySQL n'écrit que dans son volume et dans trois dossiers temporaires (`emptyDir`).
+- Requêtes et limites de CPU et de mémoire sur chaque conteneur, calées sur l'usage mesuré (commentaires dans les manifestes).
 - Un ServiceAccount par service, sans aucun droit sur l'API Kubernetes (aucun service ne l'appelle) et sans jeton monté (`k8s/rbac.yaml`).
 - NetworkPolicy (`k8s/network-policies.yaml`) : tout trafic entrant est refusé, sauf MySQL depuis le `tournament-service` et le `user-service`, le `tournament-service` depuis le frontend, le scraper et l'Ingress, le `user-service` depuis le frontend et l'Ingress, le frontend depuis l'Ingress.
+- Trivy dans la CI : les manifestes rendus ne doivent avoir aucune alerte HIGH ou CRITICAL, et chaque image aucune faille HIGH ou CRITICAL qui a un correctif.
 
 Vérifications :
 
