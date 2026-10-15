@@ -474,6 +474,7 @@ def test_builder_affiche_les_winrates(stats_api):
     )  # < 50 % : jauge rouge
     assert '<span class="type t-water">Eau</span>' in resp.text
     assert '<td class="num strong">21</td>' in resp.text  # total des statistiques de X
+    assert '<a href="/pokemon/X?format=F1">X</a>' in resp.text  # lien vers la fiche
     assert "pas encore chargées depuis PokéAPI" in resp.text  # Y
     assert resp.text.count('class="sprite"') == 1  # X ; Y n'a pas de sprite
     assert "Se connecter" in resp.text  # pas connecté : pas d'enregistrement
@@ -527,3 +528,72 @@ def test_drapeau_seulement_pour_un_code_pays():
     flag = main.templates.env.filters["flag"]
     assert flag("FR") == "https://flagcdn.com/w20/fr.png"
     assert flag(None) is None and flag("") is None and flag("1/") is None
+
+
+FICHE = {
+    "name": "Indeedee ♀",
+    "types": ["psychic", "normal"],
+    "sprite": "https://example.org/876.png",
+    "stats": {"hp": 70, "atk": 55, "def": 65, "spa": 95, "spd": 105, "spe": 85},
+    "teams": 10,
+    "format_teams": 42,
+    "usage": 0.25,
+    "wins": 30,
+    "losses": 20,
+    "winrate": 0.6,
+    "abilities": [{"name": "Psychic Surge", "share": 1.0}],
+    "items": [{"name": "Rocky Helmet", "share": 0.5}],
+    "moves": [{"name": "Follow Me", "share": 0.9}],
+    "teammates": [{"name": "Kingambit", "share": 0.333, "sprite": None}],
+}
+
+
+@pytest.fixture
+def fiche_api(monkeypatch):
+    base = "http://api/api/stats/pokemon/"
+    responses = {
+        "http://api/api/formats": [{"code": "M-C", "tournaments": 3}],
+        base + "Indeedee%20%E2%99%80?format=M-C": FICHE,
+        base + "Ditto?format=M-C": 404,
+    }
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
+
+
+def test_fiche_pokemon_en_pourcentages(fiche_api):
+    resp = client.get("/pokemon/Indeedee ♀")  # format courant par défaut
+    assert resp.status_code == 200
+    html = resp.text
+    assert "<strong>25 %</strong> des 42 équipes" in html
+    assert "<strong>60.0 %</strong> (30-20)" in html
+    assert (
+        '<li style="--pct: 90%"><span>Follow Me</span><strong>90 %</strong></li>'
+        in html
+    )
+    assert '<span class="type t-psychic">Psy</span>' in html
+    assert '<div style="--pct: 52.5%"><dt>Déf. Spé.</dt><dd>105</dd></div>' in html
+    # coéquipier sans sprite : lien vers sa fiche, arrondi à l'entier
+    assert (
+        '<a href="/pokemon/Kingambit?format=M-C">Kingambit</a><strong>33 %</strong>'
+        in html
+    )
+
+
+def test_fiche_pokemon_jamais_joue(fiche_api):
+    resp = client.get("/pokemon/Ditto?format=M-C")
+    assert resp.status_code == 404
+    assert "n'a été joué dans aucune équipe connue du format M-C" in resp.text
+
+
+def test_tournoi_lie_vers_les_fiches(api):
+    html = client.get("/tournaments/1").text
+    assert 'href="/pokemon/Staraptor?format=M-C">Staraptor</a>' in html
+
+
+def test_fiche_pokemon_donnees_incompletes(monkeypatch):
+    vide = FICHE | {"stats": None, "sprite": None, "types": [], "winrate": None}
+    vide |= {"items": [], "abilities": [], "teammates": []}
+    url = "http://api/api/stats/pokemon/Ditto?format=M-B"
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen({url: vide}))
+    html = client.get("/pokemon/Ditto?format=M-B").text
+    assert "winrate inconnu" in html and "aucune donnée" in html
+    assert "base-stats" not in html and "mon-sprite" not in html

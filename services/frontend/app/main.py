@@ -235,6 +235,26 @@ def tournament(request: Request, tournament_id: int):
     )
 
 
+STATS_FR = {"hp": "PV", "atk": "Att.", "def": "Déf.", "spa": "Att. Spé.", "spd": "Déf. Spé.", "spe": "Vit."}  # fmt: skip
+
+
+@app.get("/pokemon/{name}", response_class=HTMLResponse)
+def pokemon(request: Request, name: str, format: str | None = None):
+    """Fiche d'un Pokémon dans un format : usage, attaques, objets, talents, coéquipiers."""
+    if not format:  # par défaut : le format courant, comme le créateur d'équipe
+        formats = api_get("/api/formats")
+        format = formats[0]["code"] if formats else ""
+    ctx = {"name": name, "format": format, "p": None, "labels": STATS_FR}
+    try:
+        q = urlencode({"format": format})
+        ctx["p"] = api_get(f"/api/stats/pokemon/{quote(name, safe='')}?{q}")
+    except HTTPException as e:
+        if e.status_code != 404:
+            raise
+        return templates.TemplateResponse(request, "pokemon.html", ctx, status_code=404)
+    return templates.TemplateResponse(request, "pokemon.html", ctx)
+
+
 def builder_page(request: Request, fmt: str | None, chosen: list[str], **extra):
     """Créateur d'équipe : Pokémon légaux du format, puis winrates des Pokémon et des paires choisis."""
     formats = api_get("/api/formats")

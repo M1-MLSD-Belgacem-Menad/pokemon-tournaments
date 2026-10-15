@@ -20,7 +20,7 @@
         </span>
         {% endif %}
 {% endmacro %}
-{% macro player(s, card=false) %}
+{% macro player(s, card=false) %}{% set fmt = t.format %}
   <li{% if s.placement and s.placement <= 3 %} class="p{{ s.placement }}"{% endif %}>
   {% if s.team %}
     {# name : un seul joueur déplié à la fois (navigateurs récents) #}
@@ -31,7 +31,7 @@
         <div class="mon{% if p.types %} t-{{ p.types[0] }}{% endif %}">
           {% if p.sprite %}<img class="sprite mon-sprite" src="{{ p.sprite }}" alt="" width="64" height="64" loading="lazy">{% endif %}
           <div class="mon-body">
-          <div class="mon-head"><strong>{{ p.name }}</strong>{% if p.item %} <span class="item">@ {{ p.item }}</span>{% endif %}</div>
+          <div class="mon-head"><a class="strong" href="/pokemon/{{ p.name | urlencode }}?format={{ fmt | urlencode }}">{{ p.name }}</a>{% if p.item %} <span class="item">@ {{ p.item }}</span>{% endif %}</div>
           {% if p.types %}<div class="types">{% for ty in p.types %}<span class="type t-{{ ty }}">{{ ty | type_fr }}</span>{% endfor %}</div>{% endif %}
           {% if p.ability %}<div class="ability">{{ p.ability }}</div>{% endif %}
           {% if p.moves %}<ul class="moves">{% for m in p.moves %}
@@ -56,7 +56,7 @@
 {% if usage.top %}
 <p class="usage">
   <span class="usage-title">Les plus joués du top {{ t.standings | length }}{% if usage.teams < t.standings | length %} ({{ usage.teams }} équipes publiées){% endif %}</span>
-  {% for u in usage.top %}<span>{% if u.sprite %}<img class="mini" src="{{ u.sprite }}" alt="" width="28" height="28" loading="lazy">{% endif %}{{ u.name }} <strong>{{ u.pct }} %</strong></span>{% endfor %}
+  {% for u in usage.top %}<span>{% if u.sprite %}<img class="mini" src="{{ u.sprite }}" alt="" width="28" height="28" loading="lazy">{% endif %}<a href="/pokemon/{{ u.name | urlencode }}?format={{ t.format | urlencode }}">{{ u.name }}</a> <strong>{{ u.pct }} %</strong></span>{% endfor %}
 </p>
 {% endif %}
 {% set podium = t.standings | selectattr("placement", "in", [1, 2, 3]) | list %}

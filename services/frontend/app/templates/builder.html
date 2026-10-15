@@ -37,7 +37,7 @@
   <tbody>
   {% for name in chosen %}{% set p = info.get(name, {}) %}
     <tr>
-      <td><span class="mon-name">{% if p.sprite %}<img class="sprite" src="{{ p.sprite }}" alt="" width="40" height="40">{% endif %}{{ name }}</span></td>
+      <td><span class="mon-name">{% if p.sprite %}<img class="sprite" src="{{ p.sprite }}" alt="" width="40" height="40">{% endif %}<a href="/pokemon/{{ name | urlencode }}?format={{ format | urlencode }}">{{ name }}</a></span></td>
       <td><div class="types">{% for ty in p.types or [] %}<span class="type t-{{ ty }}">{{ ty | type_fr }}</span>{% endfor %}</div></td>
       {% if p.stats %}{% for v in p.stats.values() %}<td class="num stat" style="--v: {{ v | int }}">{{ v }}</td>{% endfor %}<td class="num strong">{{ p.stats.values() | sum }}</td>
       {% else %}<td colspan="7" class="meta">pas encore chargées depuis PokéAPI</td>{% endif %}
