@@ -152,6 +152,7 @@ CREATE TABLE team_pokemon (
 | 008 | Étape 2 | `tournament.created_by` (id utilisateur, sans clé étrangère car il vit dans `user_db`), `tournament.detail_level ENUM('winner','top16')` |
 | 009 | Étape 3 | `saved_team(id, user_id, name, format_id)`, `saved_team_pokemon(saved_team_id, slot, pokemon_id)` ; les Pokémon légaux sont calculés (décision 6), pas stockés |
 | 010 | Sprites | `pokemon_stats.sprite_url` (image PokéAPI) ; une espèce sans sprite est redemandée au prochain enrichissement |
+| 011 | Places partagées | Suppression de `UNIQUE (tournament_id, placement)` : en élimination directe, plusieurs joueurs ont la même place (deux 3es, quatre 5es) |
 
 Toutes les colonnes ajoutées après la v1 sont **nullables**, pour que les données déjà scrapées restent valides.
 
