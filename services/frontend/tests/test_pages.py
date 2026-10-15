@@ -131,14 +131,60 @@ def test_detail_affiche_le_classement_et_l_equipe(api):
         and "Intimidate" in resp.text
         and "Tailwind" in resp.text
     )
-    assert '<span class="type">Vol</span>' in resp.text  # types en français
+    assert '<span class="type t-flying">Vol</span>' in resp.text  # types en français
     assert "Brave Bird <span" in resp.text and "(Vol, physique, 120)" in resp.text
     assert "(Vol, statut)" in resp.text  # pas de puissance
     assert (
         "Close Combat</li>" in resp.text
     )  # sans détails tant qu'elle n'est pas enrichie
     assert 'src="https://flagcdn.com/w20/jp.png"' in resp.text
+    assert '<li class="p1">' in resp.text  # médaille d'or du 1er
+    assert '<div class="mon t-normal">' in resp.text  # carte teintée par le 1er type
     assert resp.text.count('class="sprite"') == 1  # Indeedee n'a pas de sprite
+    assert resp.text.count('class="sprite mon-sprite"') == 1  # idem dans le détail
+    assert '<ol class="podium">' in resp.text  # le 1er est mis en avant en carte
+    assert '<ol class="standings">' not in resp.text  # personne d'autre
+    assert (
+        "Les plus joués du top 1" in resp.text and "<strong>100 %</strong>" in resp.text
+    )
+
+
+def test_usage_compte_les_equipes_connues():
+    mon = lambda n: {"name": n, "sprite": None}
+    standings = [
+        {"team": [mon("Incineroar"), mon("Rillaboom")]},
+        {"team": [mon("Incineroar")]},
+        {"team": []},  # équipe non publiée : ignorée
+        {},  # sans clé team
+    ]
+    u = main.usage(standings)
+    assert u["teams"] == 2
+    assert u["top"] == [
+        {"name": "Incineroar", "sprite": None, "pct": 100},
+        {"name": "Rillaboom", "sprite": None, "pct": 50},
+    ]
+    assert main.usage([{"team": []}]) == {"teams": 0, "top": []}
+    # doublon dans une équipe compté une fois ; premier sprite connu conservé
+    doublon = [{"team": [mon("Urshifu") | {"sprite": "u.png"}, mon("Urshifu")]}]
+    assert main.usage(doublon)["top"] == [
+        {"name": "Urshifu", "sprite": "u.png", "pct": 100}
+    ]
+
+
+def test_podium_puis_suite_du_classement(monkeypatch):
+    premier = TOURNAMENT["standings"][0]
+    cinq = [premier | {"placement": i, "player": f"J{i}"} for i in range(1, 5)]
+    abandon = premier | {"placement": None, "player": "Abandon", "team": []}
+    data = TOURNAMENT | {"standings": [*cinq, abandon]}
+    responses = {"http://api/api/tournaments/1?top=16": data}
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
+    html = client.get("/tournaments/1").text
+    podium, suite = html.split('<ol class="standings">')
+    assert all(f"<strong>J{i}</strong>" in podium for i in (1, 2, 3))
+    assert "<strong>J4</strong>" in suite and "<strong>Abandon</strong>" in suite
+    assert '<img class="sprite big"' in podium and "<small>Staraptite</small>" in podium
+    assert '<img class="sprite big"' not in suite  # cartes réservées au podium
+    assert "Les plus joués du top 5 (4 équipes publiées)" in html
 
 
 def test_equipe_absente_est_signalee(monkeypatch):
@@ -147,7 +193,23 @@ def test_equipe_absente_est_signalee(monkeypatch):
     }
     responses = {"http://api/api/tournaments/1?top=16": sans_equipe}
     monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
-    assert "équipe non publiée" in client.get("/tournaments/1").text
+    html = client.get("/tournaments/1").text
+    assert "équipe non publiée" in html
+    assert "<details" not in html  # rien à déplier
+
+
+def test_joueur_sans_place_ne_plante_pas(monkeypatch):
+    abandon = TOURNAMENT | {
+        "standings": [TOURNAMENT["standings"][0] | {"placement": None}]
+    }
+    responses = {"http://api/api/tournaments/1?top=16": abandon}
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
+    assert client.get("/tournaments/1").status_code == 200
+
+
+def test_menu_marque_la_page_courante(api):
+    assert '<a href="/" aria-current="page">' in client.get("/tournaments/1").text
+    assert '<a href="/builder" aria-current="page">' not in client.get("/").text
 
 
 def test_tournoi_inconnu_renvoie_404(api):
@@ -358,7 +420,7 @@ def stats_api(monkeypatch):
         "http://api/api/formats/F1/legal-pokemon": ["X", "Y", "Z"],
         f"http://api/api/stats/pokemon?{q}": [
             {"pokemon": "X", "teams": 2, "wins": 5, "losses": 1, "winrate": 0.8333},
-            {"pokemon": "Y", "teams": 2, "wins": 4, "losses": 2, "winrate": 0.6667},
+            {"pokemon": "Y", "teams": 2, "wins": 2, "losses": 3, "winrate": 0.4},
         ],
         f"http://api/api/stats/combinations?{q}": [
             {
@@ -406,8 +468,13 @@ def test_builder_affiche_les_winrates(stats_api):
     )
     assert "83.3 %" in resp.text and "X + Y" in resp.text and "100.0 %" in resp.text
     assert "Z 100.0 % (5)" in resp.text  # matchup
-    assert '<span class="type">Eau</span>' in resp.text
-    assert '<td class="num">21</td>' in resp.text  # total des statistiques de X
+    assert '<td class="num strong rate" style="--w: 83.3">83.3 %</td>' in resp.text
+    assert (
+        '<td class="num strong rate low" style="--w: 40.0">40.0 %</td>' in resp.text
+    )  # < 50 % : jauge rouge
+    assert '<span class="type t-water">Eau</span>' in resp.text
+    assert '<td class="num strong">21</td>' in resp.text  # total des statistiques de X
+    assert '<a href="/pokemon/X?format=F1">X</a>' in resp.text  # lien vers la fiche
     assert "pas encore chargées depuis PokéAPI" in resp.text  # Y
     assert resp.text.count('class="sprite"') == 1  # X ; Y n'a pas de sprite
     assert "Se connecter" in resp.text  # pas connecté : pas d'enregistrement
@@ -461,3 +528,72 @@ def test_drapeau_seulement_pour_un_code_pays():
     flag = main.templates.env.filters["flag"]
     assert flag("FR") == "https://flagcdn.com/w20/fr.png"
     assert flag(None) is None and flag("") is None and flag("1/") is None
+
+
+FICHE = {
+    "name": "Indeedee ♀",
+    "types": ["psychic", "normal"],
+    "sprite": "https://example.org/876.png",
+    "stats": {"hp": 70, "atk": 55, "def": 65, "spa": 95, "spd": 105, "spe": 85},
+    "teams": 10,
+    "format_teams": 42,
+    "usage": 0.25,
+    "wins": 30,
+    "losses": 20,
+    "winrate": 0.6,
+    "abilities": [{"name": "Psychic Surge", "share": 1.0}],
+    "items": [{"name": "Rocky Helmet", "share": 0.5}],
+    "moves": [{"name": "Follow Me", "share": 0.9}],
+    "teammates": [{"name": "Kingambit", "share": 0.333, "sprite": None}],
+}
+
+
+@pytest.fixture
+def fiche_api(monkeypatch):
+    base = "http://api/api/stats/pokemon/"
+    responses = {
+        "http://api/api/formats": [{"code": "M-C", "tournaments": 3}],
+        base + "Indeedee%20%E2%99%80?format=M-C": FICHE,
+        base + "Ditto?format=M-C": 404,
+    }
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
+
+
+def test_fiche_pokemon_en_pourcentages(fiche_api):
+    resp = client.get("/pokemon/Indeedee ♀")  # format courant par défaut
+    assert resp.status_code == 200
+    html = resp.text
+    assert "<strong>25 %</strong> des 42 équipes" in html
+    assert "<strong>60.0 %</strong> (30-20)" in html
+    assert (
+        '<li style="--pct: 90%"><span>Follow Me</span><strong>90 %</strong></li>'
+        in html
+    )
+    assert '<span class="type t-psychic">Psy</span>' in html
+    assert '<div style="--pct: 52.5%"><dt>Déf. Spé.</dt><dd>105</dd></div>' in html
+    # coéquipier sans sprite : lien vers sa fiche, arrondi à l'entier
+    assert (
+        '<a href="/pokemon/Kingambit?format=M-C">Kingambit</a><strong>33 %</strong>'
+        in html
+    )
+
+
+def test_fiche_pokemon_jamais_joue(fiche_api):
+    resp = client.get("/pokemon/Ditto?format=M-C")
+    assert resp.status_code == 404
+    assert "n'a été joué dans aucune équipe connue du format M-C" in resp.text
+
+
+def test_tournoi_lie_vers_les_fiches(api):
+    html = client.get("/tournaments/1").text
+    assert 'href="/pokemon/Staraptor?format=M-C">Staraptor</a>' in html
+
+
+def test_fiche_pokemon_donnees_incompletes(monkeypatch):
+    vide = FICHE | {"stats": None, "sprite": None, "types": [], "winrate": None}
+    vide |= {"items": [], "abilities": [], "teammates": []}
+    url = "http://api/api/stats/pokemon/Ditto?format=M-B"
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen({url: vide}))
+    html = client.get("/pokemon/Ditto?format=M-B").text
+    assert "winrate inconnu" in html and "aucune donnée" in html
+    assert "base-stats" not in html and "mon-sprite" not in html
