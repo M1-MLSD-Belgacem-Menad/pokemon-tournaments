@@ -15,6 +15,7 @@ Application web autour des résultats de tournois Pokémon : recensement des tou
 | [04-guide-de-contribution.md](docs/04-guide-de-contribution.md) | Workflow GitHub, conventions de code, de commit et de test |
 | [05-checklist-conformite.md](docs/05-checklist-conformite.md) | Liste à cocher avant le rendu |
 | [06-plan-par-etapes.md](docs/06-plan-par-etapes.md) | Les 13 étapes de réalisation, avec résultat attendu et critère de réussite |
+| [onboarding/](docs/onboarding/README.md) | Accueil d'un nouveau membre : comprendre le projet, démarrer sous Windows, GitHub, méthode avec Claude, premier jour |
 | [rapport/rapport.md](docs/rapport/rapport.md) | Mini rapport du rendu : paliers atteints, architecture, captures d'écran |
 
 ## Fonctionnalités
