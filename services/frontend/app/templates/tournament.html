@@ -22,13 +22,13 @@
 <p class="meta">Cliquer sur un joueur pour voir les objets, talents et attaques de son équipe.</p>
 <ol class="standings">
 {% for s in t.standings %}
-  <li{% if s.placement and s.placement <= 3 %} class="top"{% endif %}>
+  <li{% if s.placement and s.placement <= 3 %} class="p{{ s.placement }}"{% endif %}>
   {% if s.team %}
     <details>
       <summary>{{ row(s) }}</summary>
       <div class="sets">
       {% for p in s.team %}
-        <div class="mon">
+        <div class="mon{% if p.types %} t-{{ p.types[0] }}{% endif %}">
           <div class="mon-head"><strong>{{ p.name }}</strong>{% if p.item %} <span class="item">@ {{ p.item }}</span>{% endif %}</div>
           {% if p.types %}<div class="types">{% for ty in p.types %}<span class="type t-{{ ty }}">{{ ty | type_fr }}</span>{% endfor %}</div>{% endif %}
           {% if p.ability %}<div class="ability">{{ p.ability }}</div>{% endif %}
