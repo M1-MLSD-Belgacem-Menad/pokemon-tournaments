@@ -109,7 +109,12 @@ jobs:
         run: |
           kubectl -n pokemon get pods,svc,endpointslices,networkpolicy
           kubectl -n pokemon get events --sort-by=.lastTimestamp | tail -30
-          kubectl -n pokemon logs deploy/tournament-service --all-containers --tail=50 || true
+          # Pod qui a redémarré : raison de l'arrêt et logs du conteneur précédent.
+          kubectl -n pokemon get pods -o jsonpath='{range .items[*]}{.metadata.name} {.status.containerStatuses[0].lastState.terminated}{"\n"}{end}'
+          for d in mysql user-service tournament-service; do
+            echo "--- $d (conteneur précédent)"; kubectl -n pokemon logs "deploy/$d" --previous --tail=60 || true
+            echo "--- $d"; kubectl -n pokemon logs "deploy/$d" --tail=40 | grep -v "GET /health" || true
+          done
 
   # Au push d'un tag v* (ex. v0.1.0), une fois lint, tests et déploiement verts : publie <compte>/pokemon-<service>:0.1.0.
   # Secrets GitHub à créer : DOCKERHUB_USERNAME (en minuscules) et DOCKERHUB_TOKEN (jeton d'accès Docker Hub).
