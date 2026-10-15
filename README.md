@@ -144,6 +144,8 @@ curl -k -X POST https://pokemon.local/internal/import
 kubectl -n pokemon exec deploy/frontend -- .venv/bin/python -c "import socket; socket.create_connection(('tournament-service', 50051), timeout=3)"
 ```
 
+Les mêmes vérifications, plus les routes de la gateway (HTTPS, redirection du HTTP, `/internal/` fermé), en une commande et sans fichier hosts ni tunnel : `k8s/smoke-test.sh`. Il marche sur n'importe quel cluster visé par `kubectl` (minikube, GKE) et renvoie un code d'erreur si une vérification échoue. La CI le lance à chaque PR sur un cluster kind jetable (job `deploy`).
+
 ## Déploiement sur GKE (Terraform)
 
 Palier « cloud » : `infra/gke/` crée un cluster Google Kubernetes Engine avec Terraform, puis on y applique **les mêmes manifestes** que sur minikube. Seul le cluster change : les NetworkPolicy sont appliquées par Dataplane V2 (à la place de Calico), et la gateway reçoit une IP publique (Service `LoadBalancer`).
