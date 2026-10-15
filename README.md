@@ -94,6 +94,7 @@ Les images sont tirées de Docker Hub (`menadacheraiou/pokemon-<service>`) : il 
 ```bash
 # Calico applique les NetworkPolicy (le réseau par défaut de minikube les ignore).
 # Un cluster créé sans Calico garde son réseau : le recréer avec minikube delete.
+# Sur une machine à 8 Go : donner 6 Go à Docker Desktop (Settings > Resources) et ajouter --memory=4096.
 minikube start --cni=calico
 minikube addons enable ingress
 
@@ -120,7 +121,7 @@ kubectl -n pokemon logs -f job/scraper-manuel
 kubectl -n pokemon delete job scraper-manuel   # avant de le relancer
 ```
 
-Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t menadacheraiou/pokemon-tournament:0.6.0 services/tournament-service` (idem pour le frontend et le scraper), avant `kubectl apply -k k8s/`.
+Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t menadacheraiou/pokemon-tournament:0.6.0 services/tournament-service` (idem pour `pokemon-user` avec `services/user-service`, `pokemon-frontend` et `pokemon-scraper`), avant `kubectl apply -k k8s/`.
 
 ### Sécurité du cluster
 
