@@ -130,10 +130,23 @@ def test_invalid_payload_is_rejected(client, db, broken):
     assert count(db, "tournament") == 0
 
 
+def test_shared_placements_are_accepted(client, db):
+    # Élimination directe : deux 3es (place 4 libre), comme sur Limitless.
+    payload = make_payload()
+    payload["standings"][3]["placement"] = 3
+    resp = client.post("/internal/import", json=payload)
+    assert resp.status_code == 201
+    placements = [
+        s["placement"]
+        for s in client.get(f"/api/tournaments/{resp.json()['id']}").json()["standings"]
+    ]
+    assert placements[:5] == [1, 2, 3, 3, 5]
+
+
 def test_failure_midway_writes_nothing(client, db):
     payload = make_payload()
-    # Deux joueurs à la même place : la base refuse au 16e classement, après les premières écritures.
-    payload["standings"][15]["placement"] = 1
+    # Un joueur classé deux fois : la base refuse au 16e classement, après les premières écritures.
+    payload["standings"][15]["player"] = "p1"
     resp = client.post("/internal/import", json=payload)
     assert resp.status_code == 422
     for table in [
