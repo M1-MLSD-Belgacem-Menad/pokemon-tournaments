@@ -24,7 +24,11 @@ spec:
           image: pokemon-user
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities: { drop: [ALL] }
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 100m, memory: 64Mi }
           command:
             - .venv/bin/python
             - -c
@@ -41,7 +45,12 @@ spec:
           image: pokemon-user  # compte et version : k8s/kustomization.yaml
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities: { drop: [ALL] }
+          # Mesures sur minikube avec 25 tournois (pic mesuré 63 Mo ; bcrypt consomme du CPU à la connexion) ; limite mémoire autour de 2,5 fois le pic.
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 192Mi }
           env:
             - name: DB_HOST
               value: mysql
