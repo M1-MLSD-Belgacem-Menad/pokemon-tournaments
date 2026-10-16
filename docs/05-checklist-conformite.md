@@ -9,11 +9,11 @@
 - [x] T-13 Services écrits en Python
 - [x] T-04, T-15 Chaque service a un Dockerfile qui construit sans erreur (construits par la CI à chaque PR)
 - [ ] T-05 Chaque image est publiée sur Docker Hub avec un tag de version **[Menad : secrets Docker Hub puis tag]**
-- [x] T-05 Chaque service a un Deployment et un Service Kubernetes, appliqués sur minikube sans erreur (vérifié sur minikube le 15 oct., images construites dans minikube en attendant Docker Hub)
-- [x] T-06 Une gateway (Ingress ou service mesh) route vers les services (HTTPS, HTTP redirigé, `/internal/` en 404, vérifié le 15 oct.)
+- [ ] T-05 Chaque service a un Deployment et un Service Kubernetes, appliqués sur minikube sans erreur **[manifestes prêts ; essai minikube par Menad]**
+- [ ] T-06 Une gateway (Ingress ou service mesh) route vers les services **[manifeste prêt ; essai minikube par Menad]**
 - [x] T-07 Deux services communiquent entre eux dans le cluster (frontend vers les deux API, scraper vers tournament-service)
-- [x] T-08, T-14 MySQL tourne dans le cluster (ou dans un cloud) avec un volume persistant (données conservées après suppression du pod, 15 oct.)
-- [x] T-10 Sécurité : RBAC, et au moins un parmi mTLS, sécurisation du registre, HTTPS, outil de contrôle (RBAC, NetworkPolicy, HTTPS, non-root : vérifications du README passées le 15 oct.)
+- [ ] T-08, T-14 MySQL tourne dans le cluster (ou dans un cloud) avec un volume persistant **[manifeste prêt ; essai minikube par Menad]**
+- [ ] T-10 Sécurité : RBAC, et au moins un parmi mTLS, sécurisation du registre, HTTPS, outil de contrôle **[RBAC, NetworkPolicy, HTTPS prêts ; vérifications du README par Menad]**
 - [ ] T-11 Déploiement cloud (bonus) **[Terraform GKE prêt ; `terraform apply` et capture par Menad]**
 - [x] T-16 Tout le code est sur GitHub
 - [x] T-17 Les résultats viennent d'un scraper en Python
