@@ -1,3 +1,0 @@
-# Scripts shell exécutés dans des conteneurs Linux : fins de ligne LF, même dans un clone Windows
-# (core.autocrlf) où un CRLF les casserait.
-*.sh text eol=lf

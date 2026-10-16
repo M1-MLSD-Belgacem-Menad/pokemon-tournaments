@@ -117,7 +117,7 @@ CREATE TABLE standing (
   placement      INT,                          -- NULL : abandon (migration 002)
   wins           INT,
   losses         INT,
-  UNIQUE (tournament_id, placement)             -- supprimé en 011 (places partagées)
+  UNIQUE (tournament_id, placement)
 );
 
 -- Tous les matchs du tournoi (décision du 14/10 : tous les joueurs sont enregistrés, le top 16 seul est affiché)
