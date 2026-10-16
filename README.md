@@ -94,6 +94,7 @@ Les images sont tirées de Docker Hub (`menadacheraiou/pokemon-<service>`) : il 
 ```bash
 # Calico applique les NetworkPolicy (le réseau par défaut de minikube les ignore).
 # Un cluster créé sans Calico garde son réseau : le recréer avec minikube delete.
+# Sur une machine à 8 Go : donner 6 Go à Docker Desktop (Settings > Resources) et ajouter --memory=4096.
 minikube start --cni=calico
 minikube addons enable ingress
 
@@ -120,13 +121,16 @@ kubectl -n pokemon logs -f job/scraper-manuel
 kubectl -n pokemon delete job scraper-manuel   # avant de le relancer
 ```
 
-Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t menadacheraiou/pokemon-tournament:0.6.0 services/tournament-service` (idem pour le frontend et le scraper), avant `kubectl apply -k k8s/`.
+Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t menadacheraiou/pokemon-tournament:0.6.0 services/tournament-service` (idem pour `pokemon-user` avec `services/user-service`, `pokemon-frontend` et `pokemon-scraper`), avant `kubectl apply -k k8s/`.
 
 ### Sécurité du cluster
 
-- Pods sans root (`runAsNonRoot`, utilisateur `nobody`), sans élévation de privilèges ni capacités Linux. MySQL fait exception : son image démarre en root avant de passer à l'utilisateur `mysql`.
+- Pod Security Admission en profil `restricted` sur le namespace (`k8s/namespace.yaml`) : l'API refuse tout pod qui tournerait en root, avec élévation de privilèges, capacités Linux ou sans profil seccomp.
+- Tous les conteneurs sans root (`nobody`, et `mysql` pour MySQL), avec un système de fichiers racine en lecture seule. MySQL n'écrit que dans son volume et dans trois dossiers temporaires (`emptyDir`).
+- Requêtes et limites de CPU et de mémoire sur chaque conteneur, calées sur l'usage mesuré (commentaires dans les manifestes).
 - Un ServiceAccount par service, sans aucun droit sur l'API Kubernetes (aucun service ne l'appelle) et sans jeton monté (`k8s/rbac.yaml`).
 - NetworkPolicy (`k8s/network-policies.yaml`) : tout trafic entrant est refusé, sauf MySQL depuis le `tournament-service` et le `user-service`, le `tournament-service` depuis le frontend, le scraper et l'Ingress, le `user-service` depuis le frontend et l'Ingress, le frontend depuis l'Ingress.
+- Trivy dans la CI : les manifestes rendus ne doivent avoir aucune alerte HIGH ou CRITICAL, et chaque image aucune faille HIGH ou CRITICAL qui a un correctif.
 
 Vérifications :
 
@@ -142,6 +146,8 @@ curl -k -X POST https://pokemon.local/internal/import
 # Le port gRPC n'accepte que le scraper : le frontend obtient un TimeoutError.
 kubectl -n pokemon exec deploy/frontend -- .venv/bin/python -c "import socket; socket.create_connection(('tournament-service', 50051), timeout=3)"
 ```
+
+Les mêmes vérifications, plus les routes de la gateway (HTTPS, redirection du HTTP, `/internal/` fermé), en une commande et sans fichier hosts ni tunnel : `k8s/smoke-test.sh`. Il marche sur n'importe quel cluster visé par `kubectl` (minikube, GKE) et renvoie un code d'erreur si une vérification échoue. La CI le lance à chaque PR sur un cluster kind jetable (job `deploy`).
 
 ## Déploiement sur GKE (Terraform)
 
@@ -181,7 +187,7 @@ La gateway : le même contrôleur ingress-nginx que l'addon de minikube, en vers
 
 ```powershell
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
-kubectl -n ingress-nginx wait --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=300s
+kubectl -n ingress-nginx rollout status deployment/ingress-nginx-controller --timeout=300s
 $ip = Invoke-RestMethod https://api.ipify.org
 "spec: {loadBalancerSourceRanges: [$ip/32]}" | Set-Content lb.yaml
 kubectl -n ingress-nginx patch svc ingress-nginx-controller --patch-file lb.yaml
@@ -205,7 +211,7 @@ kubectl config use-context minikube   # kubectl vise de nouveau minikube
 
 ## Publier une version
 
-Au push d'un tag `v*`, si le lint et les tests passent, la CI construit les images et les publie sur Docker Hub avec la version du tag (`v0.1.0` donne `pokemon-tournament:0.1.0`). Il faut une fois les secrets GitHub `DOCKERHUB_USERNAME` (le compte Docker Hub en minuscules, le même que dans `k8s/kustomization.yaml`) et `DOCKERHUB_TOKEN` (*Settings > Secrets and variables > Actions*).
+Au push d'un tag `v*`, si le lint et les tests passent, la CI construit les images et les publie sur Docker Hub avec la version du tag (`v0.1.0` donne `pokemon-tournament:0.1.0`). Chaque image existe en `amd64` (PC, GKE) et en `arm64` (Mac Apple Silicon) : Docker et Kubernetes tirent automatiquement la variante du processeur. Il faut une fois les secrets GitHub `DOCKERHUB_USERNAME` (le compte Docker Hub en minuscules, le même que dans `k8s/kustomization.yaml`) et `DOCKERHUB_TOKEN` (*Settings > Secrets and variables > Actions*).
 
 ```bash
 git tag v0.6.0
