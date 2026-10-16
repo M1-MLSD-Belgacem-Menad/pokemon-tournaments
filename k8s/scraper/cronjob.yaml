@@ -27,7 +27,12 @@ spec:
               image: pokemon-scraper  # compte et version : k8s/kustomization.yaml
               securityContext:
                 allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
                 capabilities: { drop: [ALL] }
+              # Pic non mesuré. Un import complet de 25 tournois (130 joueurs au plus) est passé sous cette limite sur kind.
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { cpu: 500m, memory: 256Mi }
               env:
                 # Appel par le nom DNS interne du Service, sans passer par l'Ingress.
                 - name: TOURNAMENT_API_URL
