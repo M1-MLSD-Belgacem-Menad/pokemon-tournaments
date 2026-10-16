@@ -16,7 +16,12 @@ jobs:
           version: 0.11.32
       - run: uvx ruff@0.16.8 check .
       - run: uvx ruff@0.16.8 format --check .
-      - run: kubectl kustomize k8s > /dev/null  # manifestes Kubernetes bien formés
+      - run: kubectl kustomize k8s > k8s.yaml  # manifestes Kubernetes bien formés, tels que déployés
+      # Mauvaises configurations Kubernetes (Trivy) : échec sur toute alerte HIGH ou CRITICAL.
+      # Image figée par empreinte : une étiquette peut être réécrite (compromission de Trivy en mars 2026, GHSA-69fq-xp46-6x23).
+      - run: >-
+          docker run --rm -v "$PWD/k8s.yaml:/k8s.yaml:ro" aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+          config --severity HIGH,CRITICAL --exit-code 1 /k8s.yaml
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.13.4
@@ -26,6 +31,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false  # un service en échec n'annule pas les tests des autres
       matrix:
         dir: [services/tournament-service, services/user-service, services/scraper, services/frontend]
     defaults:
@@ -50,13 +56,71 @@ jobs:
           version: 0.11.32
       - run: uv sync --frozen
       - run: uv run pytest
-      - run: docker build .
+      - run: docker build -t image-ci . && docker save image-ci -o image.tar
+      # Failles de l'image (Trivy), lue depuis une archive : Trivy n'a pas accès au démon Docker.
+      # Seules comptent les failles HIGH ou CRITICAL qui ont un correctif. Elles bloquent la publication
+      # (tag v*) ; sur une PR elles sont seulement affichées, car l'image Python de base est souvent
+      # reconstruite plusieurs jours après le correctif Debian et la PR n'y pourrait rien.
+      - run: >-
+          docker run --rm -v "$PWD/image.tar:/image.tar:ro" aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+          image --input /image.tar --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed
+          --exit-code ${{ startsWith(github.ref, 'refs/tags/v') && '1' || '0' }}
 
-  # Au push d'un tag v* (ex. v0.1.0), une fois lint et tests verts : publie <compte>/pokemon-<service>:0.1.0.
+  # Déploie k8s/ sur un cluster jetable (kind) puis lance k8s/smoke-test.sh : pods prêts, gateway en HTTPS,
+  # /internal/ fermé, NetworkPolicy, droits des comptes de service et Pod Security. kindnet applique les NetworkPolicy.
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cluster kind
+        run: |
+          curl -sSLo kind https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64
+          echo "aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d  kind" | sha256sum -c
+          sudo install kind /usr/local/bin/kind
+          kind create cluster --name pokemon --wait 120s
+      - name: Gateway (même ingress-nginx que sur GKE)
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
+          kubectl -n ingress-nginx rollout status deployment/ingress-nginx-controller --timeout=300s
+      - name: Images construites ici, aux noms et versions de k8s/kustomization.yaml
+        run: |
+          for pair in tournament:tournament-service user:user-service frontend:frontend scraper:scraper; do
+            image=$(kubectl kustomize k8s | grep -m1 -o "[^ ]*/pokemon-${pair%%:*}:[^ ]*")
+            docker build -t "$image" "services/${pair#*:}"
+            kind load docker-image "$image" --name pokemon
+          done
+      - name: Secrets jetables et déploiement
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl -n pokemon create secret generic app-secrets \
+            --from-literal=MYSQL_ROOT_PASSWORD="$(openssl rand -hex 16)" \
+            --from-literal=TOURNAMENT_DB_USER=tournament \
+            --from-literal=TOURNAMENT_DB_PASSWORD="$(openssl rand -hex 16)" \
+            --from-literal=USER_DB_USER=users \
+            --from-literal=USER_DB_PASSWORD="$(openssl rand -hex 16)" \
+            --from-literal=JWT_SECRET="$(openssl rand -hex 32)"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=pokemon.local" \
+            -addext "subjectAltName=DNS:pokemon.local" -keyout tls.key -out tls.crt
+          kubectl -n pokemon create secret tls pokemon-tls --cert=tls.crt --key=tls.key
+          kubectl apply -k k8s/
+      - run: k8s/smoke-test.sh
+      - name: État du cluster en cas d'échec
+        if: failure()
+        run: |
+          kubectl -n pokemon get pods,svc,endpointslices,networkpolicy
+          kubectl -n pokemon get events --sort-by=.lastTimestamp | tail -30
+          # Pod qui a redémarré : raison de l'arrêt et logs du conteneur précédent.
+          kubectl -n pokemon get pods -o jsonpath='{range .items[*]}{.metadata.name} {.status.containerStatuses[0].lastState.terminated}{"\n"}{end}'
+          for d in mysql user-service tournament-service; do
+            echo "--- $d (conteneur précédent)"; kubectl -n pokemon logs "deploy/$d" --previous --tail=60 || true
+            echo "--- $d"; kubectl -n pokemon logs "deploy/$d" --tail=40 | grep -v "GET /health" || true
+          done
+
+  # Au push d'un tag v* (ex. v0.1.0), une fois lint, tests et déploiement verts : publie <compte>/pokemon-<service>:0.1.0.
   # Secrets GitHub à créer : DOCKERHUB_USERNAME (en minuscules) et DOCKERHUB_TOKEN (jeton d'accès Docker Hub).
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [lint, test]
+    needs: [lint, test, deploy]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -68,7 +132,12 @@ jobs:
           - { dir: services/scraper, image: pokemon-scraper }
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+      # Images pour amd64 (PC, GKE) et arm64 (Mac Apple Silicon, minikube compris) : chaque machine
+      # tire la variante de son processeur. QEMU émule arm64 sur le runner, qui est en amd64.
+      # Ce job a le jeton Docker Hub : actions figées par commit, une étiquette pouvant être déplacée.
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130  # v3.7.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -77,5 +146,4 @@ jobs:
           IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:${{ github.ref_name }}
         run: |
           IMAGE="${IMAGE/:v/:}"  # v0.1.0 -> 0.1.0
-          docker build -t "$IMAGE" ${{ matrix.dir }}
-          docker push "$IMAGE"
+          docker buildx build --platform linux/amd64,linux/arm64 -t "$IMAGE" --push ${{ matrix.dir }}
