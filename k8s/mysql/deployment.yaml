@@ -17,14 +17,28 @@ spec:
     spec:
       serviceAccountName: mysql
       automountServiceAccountToken: false
-      # Pas de runAsNonRoot : l'image démarre en root puis passe sur l'utilisateur mysql.
+      # Lancée directement sous l'utilisateur mysql de l'image (999) : sans root, l'entrypoint saute
+      # le chown et le changement d'utilisateur. Requis par le profil Pod Security « restricted ».
       securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999  # volume au groupe mysql, quand le stockage le permet (disque GKE)
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: mysql
           image: mysql:8.4
+          # Tables temporaires internes (GROUP BY des statistiques) : jusqu'à 1 Go en mémoire par défaut,
+          # toute la limite du conteneur. Au-delà de 128 Mo, MySQL les passe sur disque.
+          args: ["--temptable-max-ram=128M"]
           securityContext:
-            allowPrivilegeEscalation: false  # le passage root -> mysql n'en a pas besoin
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          # Mesures sur minikube avec 25 tournois : pic de 462 Mo, d'où une limite à un peu plus du double.
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: 1, memory: 1Gi }
           env:
             - name: MYSQL_ROOT_PASSWORD
               valueFrom:
@@ -57,10 +71,17 @@ spec:
               mountPath: /var/lib/mysql
             - name: initdb
               mountPath: /docker-entrypoint-initdb.d
+            # Système de fichiers en lecture seule : socket et pid, fichiers temporaires, dossier d'export.
+            - { name: run, mountPath: /var/run/mysqld }
+            - { name: tmp, mountPath: /tmp }
+            - { name: files, mountPath: /var/lib/mysql-files }
       volumes:
         - name: initdb
           configMap:
             name: mysql-initdb
+        - { name: run, emptyDir: {} }
+        - { name: tmp, emptyDir: {} }
+        - { name: files, emptyDir: {} }
         - name: data
           persistentVolumeClaim:
             claimName: mysql-data
