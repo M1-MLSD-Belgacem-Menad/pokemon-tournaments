@@ -24,13 +24,13 @@ configMapGenerator:
 images:
   - name: pokemon-tournament
     newName: belgacemmenad/pokemon-tournament
-    newTag: "0.6.0"
+    newTag: "0.6.1"
   - name: pokemon-frontend
     newName: belgacemmenad/pokemon-frontend
-    newTag: "0.6.0"
+    newTag: "0.6.1"
   - name: pokemon-scraper
     newName: belgacemmenad/pokemon-scraper
-    newTag: "0.6.0"
+    newTag: "0.6.1"
   - name: pokemon-user
     newName: belgacemmenad/pokemon-user
-    newTag: "0.6.0"
+    newTag: "0.6.1"
