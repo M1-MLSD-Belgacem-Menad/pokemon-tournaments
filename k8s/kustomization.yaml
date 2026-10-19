@@ -23,14 +23,14 @@ configMapGenerator:
 # Seul endroit où changer le compte Docker Hub et la version des images.
 images:
   - name: pokemon-tournament
-    newName: menadacheraiou/pokemon-tournament
+    newName: belgacemmenad/pokemon-tournament
     newTag: "0.6.0"
   - name: pokemon-frontend
-    newName: menadacheraiou/pokemon-frontend
+    newName: belgacemmenad/pokemon-frontend
     newTag: "0.6.0"
   - name: pokemon-scraper
-    newName: menadacheraiou/pokemon-scraper
+    newName: belgacemmenad/pokemon-scraper
     newTag: "0.6.0"
   - name: pokemon-user
-    newName: menadacheraiou/pokemon-user
+    newName: belgacemmenad/pokemon-user
     newTag: "0.6.0"
