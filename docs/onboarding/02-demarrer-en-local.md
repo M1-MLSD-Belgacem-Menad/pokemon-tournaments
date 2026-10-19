@@ -29,11 +29,11 @@ uv --version
 
 ## 2. Accès au dépôt
 
-Le dépôt est https://github.com/MenadAcheraiou/pokemon-tournaments. Pour pouvoir pousser des branches, il faut que Menad t'ajoute comme collaborateur (*Settings > Collaborators > Add people* sur GitHub), puis accepter l'invitation reçue par mail.
+Le dépôt est https://github.com/M1-MLSD-Belgacem-Menad/pokemon-tournaments. Pour pouvoir pousser des branches, il faut que Menad t'ajoute comme collaborateur (*Settings > Collaborators > Add people* sur GitHub), puis accepter l'invitation reçue par mail.
 
 ```powershell
 cd C:\chemin\de\ton\choix
-git clone https://github.com/MenadAcheraiou/pokemon-tournaments.git
+git clone https://github.com/M1-MLSD-Belgacem-Menad/pokemon-tournaments.git
 cd pokemon-tournaments
 git config user.name "Prénom Nom"
 git config user.email "ton-adresse@exemple.fr"
