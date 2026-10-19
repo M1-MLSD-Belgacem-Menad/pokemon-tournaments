@@ -70,5 +70,5 @@ Types : `feat`, `fix`, `docs`, `test`, `refactor`, `ci`, `build`, `chore`, `styl
 Claude travaille souvent en même temps que vous, sur ses propres branches. Pour éviter les conflits :
 
 - avant de commencer, regarder les **PR ouvertes** et dire à Menad quels fichiers tu vas toucher ;
-- les fichiers partagés (`README.md`, `docs/README.md`, `docs/05-checklist-conformite.md`, `k8s/kustomization.yaml`, les numéros de migration) se modifient avec prudence : deux migrations `011_*.sql` créées en parallèle entreraient en conflit ;
+- les fichiers partagés (`README.md`, `docs/README.md`, `docs/05-checklist-conformite.md`, `k8s/kustomization.yaml`, les numéros de migration) se modifient avec prudence : deux migrations `012_*.sql` créées en parallèle entreraient en conflit ;
 - avant de pousser, récupérer `main` et la fusionner dans ta branche : `git fetch origin` puis `git merge origin/main`.

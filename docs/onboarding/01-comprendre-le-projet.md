@@ -98,29 +98,34 @@ Quelques règles d'architecture à garder en tête quand on code :
 
 La liste complète des routes REST et le schéma de base sont dans l'[architecture](../02-architecture.md#2-api-rest-première-version). Une fois l'application lancée, le Swagger de chaque API les montre aussi (voir la [page 2](02-demarrer-en-local.md)).
 
-## L'état d'avancement (15 octobre 2026)
+## L'état d'avancement (19 octobre 2026)
 
-Le projet a commencé le 14 octobre 2026. Le travail suit le [plan en 13 étapes](../06-plan-par-etapes.md) ; chaque étape a une issue GitHub (étape 1 = issue #1, étape N = issue #N+1 ensuite).
+Le projet a commencé le 14 octobre 2026. Le travail suit le [plan en 13 étapes](../06-plan-par-etapes.md) ; chaque étape a une issue GitHub (étape 1 = issue #1, étape N = issue #N+1 ensuite). Le dépôt est maintenant dans l'organisation GitHub du binôme, [M1-MLSD-Belgacem-Menad](https://github.com/M1-MLSD-Belgacem-Menad/pokemon-tournaments), et les images sont sur le compte Docker Hub `belgacemmenad`.
 
 | Étapes | Contenu | État |
 |---|---|---|
 | 1 à 4 | Socle, schéma et import, scraper Limitless, API de lecture et frontend | Fusionné |
-| 5 et 6 | Docker Hub, Kubernetes, Ingress, scraper en CronJob | Fusionné, **à essayer sur minikube** |
+| 5 et 6 | Docker Hub, Kubernetes, Ingress, scraper en CronJob | Fusionné, testé sur minikube et en CI (kind) |
 | 7 et 8 | `user-service`, saisie d'un tournoi local | Fusionné |
 | 9 | Enrichissement : objets, talents, attaques, types, statistiques, sprites | Fusionné |
 | 10 | Créateur d'équipes et winrates, fiche d'un Pokémon | Fusionné |
-| 11 | Sécurité du cluster | Fusionné, **à vérifier sur minikube** |
+| 11 | Sécurité du cluster | Fusionné et durci (PR #41) |
 | 12 | gRPC (fait) et cluster GKE par Terraform (écrit, **à lancer avec un compte Google Cloud**) | Issue #13 ouverte |
-| 13 | Rapport et rendu | Brouillon dans `docs/rapport/rapport.md`, issue #14 ouverte |
+| 13 | Rapport et rendu | `docs/rapport/rapport.md` (section Kubernetes avec captures minikube), issue #14 ouverte |
 
-En plus du plan, le 15 octobre : une refonte du design du frontend (PR #37) et une fiche par Pokémon (PR #38, route `GET /api/stats/pokemon/{nom}`).
+Depuis le 15 octobre :
+
+- **PR #40** : démarrage sous Mac (script d'init MySQL exécutable) et deux corrections du scraper : les places partagées en élimination directe (migration `011_places_partagees.sql`) et les attaques de puissance 0 qui bloquaient l'enrichissement.
+- **PR #41** (fusionnée, annulée puis rétablie par les PR #42 et #43) : déploiement minikube testé de bout en bout, job `deploy` dans la CI qui déploie `k8s/` sur un cluster kind et lance `k8s/smoke-test.sh`, cluster durci (Pod Security `restricted`, MySQL sans root, systèmes de fichiers en lecture seule, limites de CPU et de mémoire, scans Trivy), images publiées pour `amd64` et `arm64`.
+- **Tag `v0.6.0`** poussé. Les images `0.6.0` ont été poussées à la main sous `belgacemmenad` ; le workflow ne les publiera lui-même qu'une fois les secrets du dépôt mis à jour.
+- Belgacem travaille sur la branche `devB`. La prochaine migration SQL libre est la `012`.
 
 Ce qui reste, d'après la [checklist de conformité](../05-checklist-conformite.md) :
 
-1. Publier les images sur Docker Hub (secrets GitHub `DOCKERHUB_USERNAME` et `DOCKERHUB_TOKEN`, puis un tag `v*`).
-2. Dérouler le déploiement minikube du README à la lettre et faire les vérifications de sécurité.
-3. Lancer le cluster GKE, prendre une capture, le détruire.
+1. Mettre à jour les secrets GitHub du dépôt : `DOCKERHUB_USERNAME` = `belgacemmenad` et `DOCKERHUB_TOKEN` (jeton Docker Hub *Read & Write*), puis vérifier que la publication par tag sort bien les deux architectures (`docker buildx imagetools inspect belgacemmenad/pokemon-tournament:0.6.0`).
+2. Refaire le déploiement minikube avec les images de Docker Hub.
+3. Lancer le cluster GKE, vérifier avec `k8s/smoke-test.sh`, prendre les captures, le détruire.
 4. Les labs Google de **chaque** membre du binôme, et les rapports des deux derniers.
-5. Compléter le rapport (nom du second membre, captures), le README (section « Auteurs »), puis tag et Release `v1.0.0`, PDF unique, envoi par mail.
+5. Finir le rapport (captures GKE), puis tag et Release `v1.0.0`, PDF unique, envoi par mail.
 
-Ces essais n'ont pas pu être faits par Claude : son environnement dans le cloud ne peut pas lancer minikube, et l'accès à Limitless et PokéAPI y est bloqué. Ils se font sur un PC.
+Ces essais se font sur un PC, avec Docker Desktop, minikube et un compte Google Cloud.
