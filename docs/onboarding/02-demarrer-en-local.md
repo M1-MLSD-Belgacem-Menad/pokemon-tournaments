@@ -29,11 +29,13 @@ uv --version
 
 ## 2. Accès au dépôt
 
-Le dépôt est https://github.com/MenadAcheraiou/pokemon-tournaments. Pour pouvoir pousser des branches, il faut que Menad t'ajoute comme collaborateur (*Settings > Collaborators > Add people* sur GitHub), puis accepter l'invitation reçue par mail.
+Le dépôt est https://github.com/M1-MLSD-Belgacem-Menad/pokemon-tournaments, dans l'organisation GitHub du binôme. Pour pouvoir pousser des branches, il faut être membre de l'organisation : un propriétaire t'invite (*Organization > People > Invite member* sur GitHub), puis tu acceptes l'invitation reçue par mail.
+
+Un clone fait avant le déménagement (ancienne adresse `MenadAcheraiou/pokemon-tournaments`) marche encore grâce à la redirection de GitHub, mais autant le mettre à jour : `git remote set-url origin https://github.com/M1-MLSD-Belgacem-Menad/pokemon-tournaments.git`.
 
 ```powershell
 cd C:\chemin\de\ton\choix
-git clone https://github.com/MenadAcheraiou/pokemon-tournaments.git
+git clone https://github.com/M1-MLSD-Belgacem-Menad/pokemon-tournaments.git
 cd pokemon-tournaments
 git config user.name "Prénom Nom"
 git config user.email "ton-adresse@exemple.fr"
@@ -61,6 +63,14 @@ docker compose up --build -d
 docker compose ps        # mysql et tournament-service doivent finir en « healthy »
 ```
 
+Si le build s'arrête sur `additional privileges requested: pass "--allow=fs.read=..."`, ce n'est pas un problème de droits ou de jeton : c'est BuildKit (via Bake) qui demande une autorisation de lecture. Le désactiver pour la session PowerShell, puis relancer :
+
+```powershell
+$env:COMPOSE_BAKE = "false"
+```
+
+Pour que ce soit permanent : `[Environment]::SetEnvironmentVariable("COMPOSE_BAKE", "false", "User")`, puis rouvrir PowerShell.
+
 | URL | Ce qu'on y voit |
 |---|---|
 | http://localhost:8080 | Le site (frontend) |
@@ -70,11 +80,12 @@ docker compose ps        # mysql et tournament-service doivent finir en « healt
 Au premier lancement la base est vide : la liste des tournois aussi. Pour importer de vrais tournois (il faut Internet, le scraper interroge Limitless puis PokéAPI) :
 
 ```powershell
-docker compose run --rm --build scraper           # les 5 derniers tournois VGC, puis l'enrichissement
+$env:SCRAPE_LIMIT = 30
+docker compose run --rm --build scraper           # les 30 derniers tournois VGC, puis l'enrichissement
 docker compose run --rm --build scraper enrich    # seulement l'enrichissement PokéAPI
 ```
 
-`--build` est nécessaire : `docker compose up --build` ne reconstruit pas le scraper, qui n'est lancé qu'à la demande. Pour importer plus de tournois : `$env:SCRAPE_LIMIT=20; docker compose run --rm --build scraper`.
+`SCRAPE_LIMIT` se règle dans le même terminal que la commande. Avec la valeur par défaut (5), le scraper n'importe souvent rien : les tournois de moins de 24 h sont volontairement ignorés, et les 5 plus récents le sont souvent. `--build` est nécessaire : `docker compose up --build` ne reconstruit pas le scraper, qui n'est lancé qu'à la demande.
 
 Ensuite, sur http://localhost:8080 : ouvrir un tournoi, créer un compte, saisir un tournoi local, ouvrir « Créer une équipe ».
 
@@ -139,4 +150,4 @@ Le déploiement sur minikube et sur GKE est décrit pas à pas dans le README :
 
 Dans les commandes du README, sous PowerShell, écrire `curl.exe` au lieu de `curl` (sinon PowerShell utilise son alias `Invoke-WebRequest`). Le fichier hosts est `C:\Windows\System32\drivers\etc\hosts`, à éditer en administrateur.
 
-Ces déploiements n'ont pas encore été essayés en vrai (voir la [page 1](01-comprendre-le-projet.md#létat-davancement-15-octobre-2026)) : c'est une bonne première contribution, à faire en suivant le README à la lettre et en notant chaque écart.
+Le déploiement minikube a été testé de bout en bout (PR #41), et la CI le rejoue à chaque PR sur un cluster kind. Après `kubectl apply -k k8s/`, `bash k8s/smoke-test.sh` (depuis **Git Bash**, pas PowerShell) fait toutes les vérifications de sécurité d'un coup et finit par « Toutes les vérifications passent ». GKE reste à lancer (voir la [page 1](01-comprendre-le-projet.md#létat-davancement-19-octobre-2026)).

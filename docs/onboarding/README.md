@@ -1,6 +1,6 @@
 # Bienvenue dans le projet
 
-Ce dossier est écrit pour le binôme de Menad, qui arrive sur le projet sans le connaître. Il dit ce qu'est le projet, comment le faire tourner sur son PC, comment on travaille sur GitHub, et comment Claude est utilisé pour avancer. État décrit : **15 octobre 2026**.
+Ce dossier est écrit pour le binôme de Menad, qui arrive sur le projet sans le connaître. Il dit ce qu'est le projet, comment le faire tourner sur son PC, comment on travaille sur GitHub, et comment Claude est utilisé pour avancer. État décrit : **19 octobre 2026**.
 
 ## Ordre de lecture
 

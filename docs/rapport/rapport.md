@@ -6,8 +6,8 @@
 |---|---|
 | Binôme | Menad Acheraiou, Belgacem Smaali |
 | Formation | Master 1 MLSD, Programmation distribuée |
-| Dépôt GitHub | https://github.com/MenadAcheraiou/pokemon-tournaments |
-| Images Docker Hub | `menadacheraiou/pokemon-tournament`, `pokemon-user`, `pokemon-frontend`, `pokemon-scraper` (version du tag Git, par exemple `0.6.0`) |
+| Dépôt GitHub | https://github.com/M1-MLSD-Belgacem-Menad/pokemon-tournaments |
+| Images Docker Hub | `belgacemmenad/pokemon-tournament`, `pokemon-user`, `pokemon-frontend`, `pokemon-scraper` (version du tag Git, par exemple `0.6.0`) |
 | Version rendue | **[À compléter : `v1.0.0`]** |
 
 ## 1. Ce que fait l'application

@@ -53,7 +53,7 @@ La base jetable n'est pas lancée ou pas prête : voir la [page 2](02-demarrer-e
 Lancer `uvx ruff@0.16.8 format --check .` : c'est souvent le formatage. Sinon, ouvrir le job rouge dans l'onglet *Checks* et lire la première erreur.
 
 **Je veux ajouter une colonne en base.**
-Ajouter une nouvelle migration `services/tournament-service/migrations/011_xxx.sql` (numéro suivant le plus grand), colonne nullable, et vérifier avec Menad qu'aucun autre travail en cours n'utilise le même numéro. Ne jamais modifier une migration déjà fusionnée.
+Ajouter une nouvelle migration `services/tournament-service/migrations/012_xxx.sql` (numéro suivant le plus grand), colonne nullable, et vérifier avec Menad qu'aucun autre travail en cours n'utilise le même numéro. Ne jamais modifier une migration déjà fusionnée.
 
 **Je peux fusionner ma PR moi-même ?**
 Une fois la CI verte et la relecture de l'autre membre faite, oui : la règle est qu'une PR est relue par l'autre avant la fusion. Les PR de Claude, elles, sont toujours fusionnées par un humain.

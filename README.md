@@ -89,7 +89,7 @@ docker compose down -v     # repart d'une base vide
 
 ## Déploiement sur Kubernetes (minikube)
 
-Les images sont tirées de Docker Hub (`menadacheraiou/pokemon-<service>`) : il faut d'abord [publier la version](#publier-une-version) indiquée dans `k8s/kustomization.yaml`, qui fixe le compte et la version des images pour le cluster.
+Les images sont tirées de Docker Hub (`belgacemmenad/pokemon-<service>`) : il faut d'abord [publier la version](#publier-une-version) indiquée dans `k8s/kustomization.yaml`, qui fixe le compte et la version des images pour le cluster.
 
 ```bash
 # Calico applique les NetworkPolicy (le réseau par défaut de minikube les ignore).
@@ -121,7 +121,7 @@ kubectl -n pokemon logs -f job/scraper-manuel
 kubectl -n pokemon delete job scraper-manuel   # avant de le relancer
 ```
 
-Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t menadacheraiou/pokemon-tournament:0.6.0 services/tournament-service` (idem pour `pokemon-user` avec `services/user-service`, `pokemon-frontend` et `pokemon-scraper`), avant `kubectl apply -k k8s/`.
+Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t belgacemmenad/pokemon-tournament:0.6.0 services/tournament-service` (idem pour `pokemon-user` avec `services/user-service`, `pokemon-frontend` et `pokemon-scraper`), avant `kubectl apply -k k8s/`.
 
 ### Sécurité du cluster
 
