@@ -50,14 +50,14 @@ code { background: var(--line); padding: 0 0.3em; border-radius: 3px; }
   background: radial-gradient(circle, #fff 0 18%, #1c2230 19% 30%, transparent 31%), linear-gradient(#c7362b 0 44%, #1c2230 44% 56%, #fff 56%);
 }
 nav { display: flex; align-items: center; gap: 0.2rem; margin-left: auto; }
-nav a { padding: 0.4rem 0.65rem; border-radius: var(--radius); text-decoration: none; color: rgb(255 255 255 / 0.85); white-space: nowrap; }
+nav a { padding: 0.4rem 0.65rem; border-radius: var(--radius); text-decoration: none; color: rgb(255 255 255 / 0.93); white-space: nowrap; } /* 0.93 : contraste ≥ 4,5 sur le rouge */
 nav a:hover { color: #fff; background: rgb(0 0 0 / 0.18); }
 nav a[aria-current="page"] { color: #fff; font-weight: 600; background: rgb(0 0 0 / 0.22); }
 nav button.quiet { color: #fff; border-color: rgb(255 255 255 / 0.6); white-space: nowrap; }
 nav button.quiet:hover { color: #fff; border-color: #fff; background: rgb(0 0 0 / 0.15); }
 nav form { margin: 0 0 0 0.4rem; }
 /* Bouton du thème : soleil en sombre, lune en clair (le symbole montre le thème proposé) */
-.theme { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; border-radius: 50%; border: 1px solid rgb(255 255 255 / 0.45); background: none; font-size: 1rem; line-height: 1; flex: none; }
+.theme { display: grid; place-items: center; width: 2.4rem; height: 2.4rem; padding: 0; border-radius: 50%; border: 1px solid rgb(255 255 255 / 0.45); background: none; font-size: 1rem; line-height: 1; flex: none; }
 .theme:hover { background: rgb(0 0 0 / 0.18); filter: none; }
 .theme::before { content: "☾"; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme::before { content: "☀"; } }
