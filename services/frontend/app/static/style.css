@@ -1,37 +1,27 @@
-/* Mise en page : une colonne centrée sous un bandeau rouge, des tableaux et des listes plutôt que des cartes.
+/* Mise en page : une colonne centrée sous un bandeau collant, des tableaux et des listes plutôt que des cartes.
    Couleurs : un fond gris bleuté, une encre sombre, le rouge de la Poké Ball, les couleurs des types. */
+/* Couleurs : light-dark(clair, sombre). Le thème suit le système, ou le choix du bouton (data-theme sur <html>). */
 :root {
-  --bg: #f4f5f7;
-  --surface: #fff;
-  --ink: #1c2230;
-  --muted: #5e6678;
-  --line: #e1e4ea;
-  --accent: #c7362b;
+  color-scheme: light dark;
+  --bg: light-dark(#f3f4f7, #111318);
+  --surface: light-dark(#fff, #1a1d24);
+  --ink: light-dark(#191f2c, #e7e9ee);
+  --muted: light-dark(#5b6476, #9ca3b0);
+  --line: light-dark(#e0e3ea, #2b303a);
+  --accent: light-dark(#c7362b, #ec6a5e);
   --accent-ink: #fff;
   --button: #c7362b; /* même rouge dans les deux thèmes : texte blanc lisible (contraste AA) */
-  --ok: #1f7a4d;
-  --win: #1f7a4d; /* barres de winrate : paire vert/rouge vérifiée daltonisme (skill dataviz) */
-  --brand: #b8302a; /* bandeau : même rouge dans les deux thèmes */
-  --head: #eceef2; /* en-têtes de tableaux */
+  --ok: light-dark(#1f7a4d, #4fbf87);
+  --win: light-dark(#1f7a4d, #2f9a66); /* barres de winrate : paire vert/rouge vérifiée daltonisme (skill dataviz) */
+  --brand: light-dark(#b8302a, #1a1d24); /* bandeau rouge en clair, sombre en sombre (moins éblouissant) */
+  --head: light-dark(#eceef2, #222631); /* en-têtes de tableaux */
+  --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 3px rgb(16 24 40 / 0.05);
   --gold: #e3b341; --silver: #b8bec8; --bronze: #c98a55;
-  --radius: 6px;
+  --radius: 10px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #14171d;
-    --surface: #1c2028;
-    --ink: #e6e8ec;
-    --muted: #9aa1ae;
-    --line: #2d323c;
-    --accent: #e0574b;
-    --ok: #4fbf87;
-    --win: #2f9a66;
-    --head: #232833;
-    color-scheme: dark;
-  }
-}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
 
 * { box-sizing: border-box; }
 body {
@@ -47,25 +37,31 @@ a:hover { color: var(--accent); }
 .site-header :focus-visible { outline-color: #fff; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 h1, h2 { line-height: 1.2; text-wrap: balance; }
-h1 { font-size: 1.6rem; margin: 0 0 0.3rem; }
-h2 { font-size: 1.1rem; margin: 2rem 0 0.6rem; }
+h1 { font-size: clamp(1.6rem, 1.2rem + 1.5vw, 2.1rem); font-weight: 800; letter-spacing: -0.02em; margin: 0 0 0.35rem; }
+h2 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; margin: 2.2rem 0 0.7rem; }
 code { background: var(--line); padding: 0 0.3em; border-radius: 3px; }
 
-/* En-tête : bandeau rouge */
-.site-header { background: var(--brand); color: #fff; }
-.site-header .inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1.5rem; padding-block: 0.7rem; }
-.brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; text-decoration: none; }
+/* En-tête : bandeau rouge (sombre en thème sombre) collé en haut, liseré rouge en bas */
+.site-header { position: sticky; top: 0; z-index: 10; background: var(--brand); color: #fff; border-bottom: 3px solid var(--button); }
+.site-header .inner { display: flex; align-items: center; gap: 0.5rem 1.5rem; padding-block: 0.6rem; }
+.brand { display: flex; align-items: center; gap: 0.55rem; font-weight: 800; font-size: 1.05rem; letter-spacing: -0.01em; text-decoration: none; white-space: nowrap; }
 .brand::before { /* Poké Ball minimaliste */
-  content: ""; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff;
-  background: radial-gradient(circle, #fff 0 18%, #1c2230 19% 30%, transparent 31%), linear-gradient(var(--brand) 0 44%, #1c2230 44% 56%, #fff 56%);
+  content: ""; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; flex: none;
+  background: radial-gradient(circle, #fff 0 18%, #1c2230 19% 30%, transparent 31%), linear-gradient(#c7362b 0 44%, #1c2230 44% 56%, #fff 56%);
 }
-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.2rem; }
-nav a { padding: 0.35rem 0.6rem; border-radius: var(--radius); text-decoration: none; color: rgb(255 255 255 / 0.85); }
-nav a:hover { color: #fff; background: rgb(0 0 0 / 0.15); }
-nav a[aria-current="page"] { color: #fff; font-weight: 600; box-shadow: inset 0 -2px #fff; border-radius: 0; }
-nav button.quiet { color: #fff; border-color: rgb(255 255 255 / 0.6); }
+nav { display: flex; align-items: center; gap: 0.2rem; margin-left: auto; }
+nav a { padding: 0.4rem 0.65rem; border-radius: var(--radius); text-decoration: none; color: rgb(255 255 255 / 0.85); white-space: nowrap; }
+nav a:hover { color: #fff; background: rgb(0 0 0 / 0.18); }
+nav a[aria-current="page"] { color: #fff; font-weight: 600; background: rgb(0 0 0 / 0.22); }
+nav button.quiet { color: #fff; border-color: rgb(255 255 255 / 0.6); white-space: nowrap; }
 nav button.quiet:hover { color: #fff; border-color: #fff; background: rgb(0 0 0 / 0.15); }
 nav form { margin: 0 0 0 0.4rem; }
+/* Bouton du thème : soleil en sombre, lune en clair (le symbole montre le thème proposé) */
+.theme { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; padding: 0; border-radius: 50%; border: 1px solid rgb(255 255 255 / 0.45); background: none; font-size: 1rem; line-height: 1; flex: none; }
+.theme:hover { background: rgb(0 0 0 / 0.18); filter: none; }
+.theme::before { content: "☾"; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme::before { content: "☀"; } }
+:root[data-theme="dark"] .theme::before { content: "☀"; }
 
 .inner { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 main.inner { padding-block: 2rem 3rem; }
@@ -80,7 +76,7 @@ main.inner { padding-block: 2rem 3rem; }
 
 /* Tableaux */
 /* Surfaces blanches bordées (tableaux, formulaires, classement) */
-.scroll, .panel, .podium, .standings { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.scroll, .panel, .podium, .standings { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
 .scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
@@ -253,6 +249,9 @@ form:has(input[value="winner"]:checked) .entry tbody tr:not(:first-child) { opac
   .sets { padding-left: 0.8rem; }
   .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .base-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; margin-left: 0; }
-  .site-header .inner { flex-direction: column; align-items: flex-start; }
+  /* Menu sur une ligne qui défile horizontalement plutôt que sur trois lignes */
+  .site-header .inner { flex-wrap: wrap; }
+  nav { order: 3; width: 100%; margin: 0; overflow-x: auto; scrollbar-width: none; }
+  .theme { margin-left: auto; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

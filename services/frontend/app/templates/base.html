@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Tournois Pokémon VGC{% endblock %}</title>
   <link rel="stylesheet" href="/static/style.css">
+  <meta name="theme-color" content="#b8302a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a1d24" media="(prefers-color-scheme: dark)">
+  {# Thème choisi avec le bouton, appliqué avant l'affichage pour éviter un flash #}
+  <script>if (localStorage.theme) document.documentElement.dataset.theme = localStorage.theme</script>
 </head>
 <body>
   {% set path = request.url.path %}
@@ -23,6 +27,9 @@
         {{ link("/register", "Inscription") }}
       {% endif %}
       </nav>
+      <button class="theme" type="button" aria-label="Changer de thème (clair ou sombre)" title="Changer de thème"
+        onclick="const d = document.documentElement, dark = matchMedia('(prefers-color-scheme: dark)').matches;
+                 d.dataset.theme = localStorage.theme = (d.dataset.theme || (dark ? 'dark' : 'light')) === 'dark' ? 'light' : 'dark'"></button>
     </div>
   </header>
   <main class="inner">
