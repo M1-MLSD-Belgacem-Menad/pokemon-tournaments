@@ -42,7 +42,7 @@
   {% endfor %}
   </ul>
 </section>
-<p class="meta">Régression logistique : un poids par Pokémon, la probabilité vient de la différence entre les sommes des poids des deux équipes. Entraîné le {{ m.trained_at[:10] }} ; sur les {{ m.test_matches }} matchs des tournois les plus récents, gardés pour le test : log-loss {{ "%.3f" | format(m.log_loss) }} (0,693 pour un pile ou face), score de Brier {{ "%.3f" | format(m.brier) }} (0,25), bon vainqueur dans {{ (m.accuracy * 100) | round | int }} % des cas. Le niveau des joueurs n'est pas pris en compte : c'est une tendance, pas une certitude.</p>
+<p class="meta">Régression logistique : un poids par Pokémon, la probabilité vient de la différence entre les sommes des poids des deux équipes. Entraîné le {{ m.trained_at[:10] }} ; sur les {{ m.test_matches }} matchs des tournois les plus récents, gardés pour le test : log-loss {{ "%.3f" | format(m.log_loss) }} (0.693 pour un pile ou face), score de Brier {{ "%.3f" | format(m.brier) }} (0.25), bon vainqueur dans {{ (m.accuracy * 100) | round | int }} % des cas. Le niveau des joueurs n'est pas pris en compte : c'est une tendance, pas une certitude.</p>
 {% endif %}
 {% endif %}
 {% endblock %}

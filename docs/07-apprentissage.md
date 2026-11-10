@@ -158,6 +158,8 @@ Quand l'équipe a entre 1 et 5 Pokémon, le créateur affiche les trois Pokémon
 
 La raison affichée est celle du meilleur partenaire. Exemple réel pour Kingambit seul : « Aerodactyl. Avec Kingambit : 54 % de victoires sur 35 équipes (+5,6 pts par rapport à son winrate habituel). » La ligne « Modèle : +x pts » n'apparaît que si le modèle bat la référence.
 
+Captures (données des 94 tournois, base locale) : [créateur](rapport/ml-createur-suggestions.png), [face-à-face](rapport/ml-face-a-face.png), [fiche Pokémon avec intervalle](rapport/ml-fiche-fiabilite.png).
+
 ## 6. Limites
 
 - **Le niveau des joueurs n'est pas dans le modèle.** Un bon joueur gagne avec une équipe moyenne. C'est la plus grosse source de bruit : la précision attendue reste modeste, même avec beaucoup de données. Ajouter un niveau par joueur (Elo) demanderait de suivre les joueurs d'un tournoi à l'autre. C'est possible avec `player.source_id`, mais hors du périmètre de ce POC.

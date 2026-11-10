@@ -169,6 +169,10 @@ Méthode complète, formules et limites : [`docs/07-apprentissage.md`](../07-app
 
 - **Mise en production** : l'entraînement tourne dans un CronJob Kubernetes avec la même image que le `tournament-service`, et écrit les poids dans MySQL. L'API prédit en additionnant des poids, sans scikit-learn, et toutes ses répliques lisent le même modèle.
 - **Suggestions du créateur** : score = synergie avec les Pokémon déjà choisis (winrate ensemble comparé au winrate habituel du candidat, lissé) + gain de probabilité estimé par le modèle.
+![Créateur : Pokémon à ajouter et fiabilité des winrates](ml-createur-suggestions.png)
+
+![Face-à-face, avec l'avertissement quand le modèle ne bat pas 50 %](ml-face-a-face.png)
+
 - **Limites** : le niveau des joueurs n'est pas modélisé, alors qu'il compte au moins autant que l'équipe. Le modèle additif ne voit pas les contres entre deux Pokémon. Les données viennent d'un seul site de tournois en ligne.
 
 ## 9. Labs Google **[À compléter]**
