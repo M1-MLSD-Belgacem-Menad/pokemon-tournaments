@@ -14,8 +14,9 @@
 {% if not p %}
 <h1>{{ name }}</h1>
 <p class="lead">Ce Pokémon n'a été joué dans aucune équipe connue du format {{ format }}.</p>
+<p><a class="button" href="/builder?format={{ format | urlencode }}">Voir les Pokémon joués dans ce format</a></p>
 {% else %}
-<div class="panel fiche">
+<div class="panel fiche{% if p.types %} t-{{ p.types[0] }}{% endif %}">
   {% if p.sprite %}<img class="sprite mon-sprite" src="{{ p.sprite }}" alt="" width="96" height="96">{% endif %}
   <div>
     <h1>{{ p.name }}</h1>

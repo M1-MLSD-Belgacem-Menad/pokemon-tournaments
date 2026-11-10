@@ -186,10 +186,12 @@ fieldset label { flex-direction: row; align-items: center; gap: 0.5rem; font-wei
 .moves .meta { font-size: 0.78rem; }
 
 /* Fiche d'un Pokémon : en-tête (sprite, types, statistiques de base) puis barres de pourcentages */
-.fiche { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.2rem; margin-bottom: 1rem; }
+/* teinte du premier type : liseré, fond du sprite et jauges des statistiques */
+:where(.fiche) { --t: var(--muted); }
+.fiche { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.2rem; margin-bottom: 1rem; border-top: 4px solid var(--t); background: linear-gradient(135deg, color-mix(in srgb, var(--t) 10%, var(--surface)), var(--surface) 55%); }
 .fiche h1 { margin: 0 0 0.3rem; }
 .fiche .meta { margin: 0.4rem 0 0; }
-.fiche .mon-sprite { --t: var(--muted); }
+.fiche .base-stats div { --fill: var(--t); }
 .base-stats { display: grid; grid-template-columns: repeat(6, minmax(3.2rem, 1fr)); gap: 0.6rem; margin: 0 0 0 auto; }
 .base-stats div { text-align: center; }
 .base-stats dt { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
