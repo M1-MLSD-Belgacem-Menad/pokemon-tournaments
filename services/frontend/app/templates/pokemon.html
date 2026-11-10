@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import types %}
+{% from "_macros.html" import types, reliability %}
 {% block title %}{{ p.name if p else name }}{% endblock %}
 {% macro bars(rows, title, sprites=false) %}
 <section class="panel">
@@ -22,7 +22,7 @@
   <div>
     <h1>{{ p.name }}</h1>
     {{ types(p.types) }}
-    <p class="meta">Format <span class="tag">{{ format }}</span> · joué par <strong>{{ (p.usage * 100) | round | int }} %</strong> des {{ p.format_teams }} équipes · winrate {% if p.winrate is not none %}<strong>{{ "%.1f" | format(p.winrate * 100) }} %</strong> ({{ p.wins }}-{{ p.losses }}){% else %}inconnu{% endif %}</p>
+    <p class="meta">Format <span class="tag">{{ format }}</span> · joué par <strong>{{ (p.usage * 100) | round | int }} %</strong> des {{ p.format_teams }} équipes · winrate {% if p.winrate is not none %}<strong>{{ "%.1f" | format(p.winrate * 100) }} %</strong> ({{ p.wins }}-{{ p.losses }}) {{ reliability(p) }}{% else %}inconnu{% endif %}</p>
   </div>
   {% if p.stats %}
   <dl class="base-stats">

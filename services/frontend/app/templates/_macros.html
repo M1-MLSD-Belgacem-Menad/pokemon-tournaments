@@ -1,2 +1,4 @@
 {# Pastilles de types d'un Pokémon (rien si les types ne sont pas encore connus) #}
 {% macro types(list) %}{% if list %}<div class="types">{% for ty in list %}<span class="type t-{{ ty }}">{{ ty | type_fr }}</span>{% endfor %}</div>{% endif %}{% endmacro %}
+{# Intervalle de confiance à 95 % d'un winrate et badge quand il repose sur moins de 30 matchs #}
+{% macro reliability(r) %}{% if r.ci_low is defined %}<span class="ci" title="intervalle de confiance à 95 %">{{ (r.ci_low * 100) | round | int }}–{{ (r.ci_high * 100) | round | int }} %</span>{% if r.low_data %} <span class="tag low-data">peu de données</span>{% endif %}{% endif %}{% endmacro %}
