@@ -118,6 +118,7 @@ def test_liste_avec_lien_vers_le_detail(api):
     assert resp.status_code == 200
     assert "VGC Test Cup" in resp.text
     assert 'href="/tournaments/1"' in resp.text
+    assert "<strong>92</strong> participations" in resp.text  # chiffres clés
 
 
 def test_detail_affiche_le_classement_et_l_equipe(api):
@@ -213,7 +214,19 @@ def test_menu_marque_la_page_courante(api):
 
 
 def test_tournoi_inconnu_renvoie_404(api):
-    assert client.get("/tournaments/999").status_code == 404
+    resp = client.get("/tournaments/999")
+    assert resp.status_code == 404
+    assert "Page introuvable" in resp.text  # page du site, pas du JSON
+    assert 'href="/"' in resp.text
+
+
+def test_page_inconnue_affiche_la_page_d_erreur():
+    resp = client.get("/nimporte-quoi")
+    assert resp.status_code == 404 and "Page introuvable" in resp.text
+    resp = client.get("/tournaments/abc")  # identifiant non numérique
+    assert resp.status_code == 422 and "pas le bon format" in resp.text
+    resp = client.get("/logout")  # POST seulement : l'en-tête Allow est gardé
+    assert resp.status_code == 405 and resp.headers["allow"] == "POST"
 
 
 def test_erreur_de_l_api_renvoie_502(api):
@@ -225,7 +238,8 @@ def test_api_injoignable_renvoie_503(monkeypatch):
         raise urllib.error.URLError("connexion refusée")
 
     monkeypatch.setattr(main.urllib.request, "urlopen", down)
-    assert client.get("/").status_code == 503
+    resp = client.get("/")
+    assert resp.status_code == 503 and "ne répond pas" in resp.text
 
 
 def test_internal_not_served():
@@ -477,6 +491,8 @@ def test_builder_affiche_les_winrates(stats_api):
     assert '<a href="/pokemon/X?format=F1">X</a>' in resp.text  # lien vers la fiche
     assert "pas encore chargées depuis PokéAPI" in resp.text  # Y
     assert resp.text.count('class="sprite"') == 1  # X ; Y n'a pas de sprite
+    assert '<li class="mon t-water">' in resp.text  # carte de X dans « Mon équipe »
+    assert '<li class="mon">' in resp.text  # Y, sans type connu : pas de teinte
     assert "Se connecter" in resp.text  # pas connecté : pas d'enregistrement
 
 

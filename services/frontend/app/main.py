@@ -10,9 +10,11 @@ from urllib.parse import quote, urlencode, urlsplit
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 # Absentes : le service refuse de démarrer.
 API_URL = os.environ["TOURNAMENT_API_URL"]
@@ -54,6 +56,23 @@ async def same_origin_posts(request: Request, call_next):
     ):
         return PlainTextResponse("formulaire d'un autre site refusé", status_code=403)
     return await call_next(request)
+
+
+def error_page(request: Request, code: int, headers: dict | None = None):
+    """Page inconnue ou erreur d'un service : une page du site plutôt que du JSON brut."""
+    return templates.TemplateResponse(
+        request, "error.html", {"code": code}, status_code=code, headers=headers
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request: Request, exc: StarletteHTTPException):
+    return error_page(request, exc.status_code, exc.headers)  # ex. Allow sur un 405
+
+
+@app.exception_handler(RequestValidationError)  # ex. /tournaments/abc
+async def validation_error(request: Request, exc: RequestValidationError):
+    return error_page(request, 422)
 
 
 ROWS, TEAM_SIZE = 16, 6  # lignes et Pokémon par ligne du formulaire de saisie

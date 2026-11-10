@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import types %}
 {% block title %}{{ p.name if p else name }}{% endblock %}
 {% macro bars(rows, title, sprites=false) %}
 <section class="panel">
@@ -14,12 +15,13 @@
 {% if not p %}
 <h1>{{ name }}</h1>
 <p class="lead">Ce Pokémon n'a été joué dans aucune équipe connue du format {{ format }}.</p>
+<p><a class="button" href="/builder?format={{ format | urlencode }}">Voir les Pokémon joués dans ce format</a></p>
 {% else %}
-<div class="panel fiche">
+<div class="panel fiche{% if p.types %} t-{{ p.types[0] }}{% endif %}">
   {% if p.sprite %}<img class="sprite mon-sprite" src="{{ p.sprite }}" alt="" width="96" height="96">{% endif %}
   <div>
     <h1>{{ p.name }}</h1>
-    {% if p.types %}<div class="types">{% for ty in p.types %}<span class="type t-{{ ty }}">{{ ty | type_fr }}</span>{% endfor %}</div>{% endif %}
+    {{ types(p.types) }}
     <p class="meta">Format <span class="tag">{{ format }}</span> · joué par <strong>{{ (p.usage * 100) | round | int }} %</strong> des {{ p.format_teams }} équipes · winrate {% if p.winrate is not none %}<strong>{{ "%.1f" | format(p.winrate * 100) }} %</strong> ({{ p.wins }}-{{ p.losses }}){% else %}inconnu{% endif %}</p>
   </div>
   {% if p.stats %}
