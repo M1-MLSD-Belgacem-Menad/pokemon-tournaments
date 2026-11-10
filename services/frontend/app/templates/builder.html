@@ -48,14 +48,14 @@
 {% for s in suggestions %}{% set best = s.partners[0] %}
   <li class="panel">
     <span class="mon-name">{% if s.sprite %}<img class="sprite" src="{{ s.sprite }}" alt="" width="40" height="40">{% endif %}{{ s.pokemon }}</span>
-    {% if best.wins + best.losses %}<p>Avec {{ best.partner }} : <strong>{{ "%.0f" | format(100 * best.wins / (best.wins + best.losses)) }} %</strong> de victoires sur {{ best.teams }} équipe{{ "s" if best.teams > 1 }} ({{ "%+.1f" | format(best.delta * 100) }} pts par rapport à son winrate habituel).</p>
+    {% if best.teams %}<p>Joué avec {{ best.partner }} dans <strong>{{ "%.0f" | format(best.share * 100) }} %</strong> de ses équipes.</p>
+    {% if best.winrate is not none %}<p class="meta">Ensemble : {{ "%.0f" | format(best.winrate * 100) }} % de victoires {{ reliability(best) }}</p>{% endif %}
     {% else %}<p class="meta">Jamais joué avec les Pokémon choisis.</p>{% endif %}
-    {% if s.gain is not none %}<p class="meta">Modèle : {{ "%+.1f" | format(s.gain * 100) }} pts de chances de battre une équipe moyenne du format.</p>{% endif %}
     <a class="button" href="/builder?{{ s.query }}">Ajouter {{ s.pokemon }}</a>
   </li>
 {% endfor %}
 </ul>
-<p class="meta">Classement : synergie avec les Pokémon déjà choisis (winrate ensemble comparé au winrate habituel, lissé quand il y a peu d'équipes) plus le gain estimé par le modèle de matchup, seulement s'il prédit mieux qu'un pile ou face sur les tournois récents. Un Pokémon n'est proposé qu'après au moins 30 matchs avec l'un des Pokémon choisis.</p>
+<p class="meta">Classement par fréquence d'association avec les Pokémon déjà choisis dans les équipes de ce format. C'est la méthode qui retrouve le mieux les choix réels des joueurs (voir la documentation). Le winrate des équipes qui jouent la paire est affiché à titre indicatif : il dépend aussi du niveau des joueurs et ne sert pas au classement.</p>
 {% endif %}
 <h2>Statistiques de base</h2>
 <div class="scroll">

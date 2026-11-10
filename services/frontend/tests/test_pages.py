@@ -477,9 +477,27 @@ def stats_api(monkeypatch):
             {
                 "pokemon": "Z",
                 "sprite": None,
-                "gain": 0.031,
+                "score": -1.2,
                 "partners": [
-                    {"partner": "X", "teams": 4, "wins": 9, "losses": 3, "delta": 0.052}
+                    {
+                        "partner": "X",
+                        "teams": 4,
+                        "share": 0.4,
+                        "wins": 9,
+                        "losses": 3,
+                        "winrate": 0.75,
+                        "ci_low": 0.4677,
+                        "ci_high": 0.9111,
+                        "low_data": True,
+                    },
+                    {
+                        "partner": "Y",
+                        "teams": 0,
+                        "share": 0.0,
+                        "wins": 0,
+                        "losses": 0,
+                        "winrate": None,
+                    },
                 ],
             }
         ],
@@ -520,11 +538,15 @@ def test_builder_fiabilite_et_suggestions(stats_api):
     assert (
         '44–97 %</span> <span class="tag low-data">peu de données</span>' in resp.text
     )
+    assert "Joué avec X dans <strong>40 %</strong> de ses équipes." in resp.text
     assert (
-        "Avec X : <strong>75 %</strong> de victoires sur 4 équipes (+5.2 pts"
-        in resp.text
+        'Ensemble : 75 % de victoires <span class="ci" title="intervalle de confiance à 95 %">47–91 %</span>'
+        ' <span class="tag low-data">peu de données</span>' in resp.text
     )
-    assert "Modèle : +3.1 pts" in resp.text
+    assert (
+        "Classement par fréquence d'association" in resp.text
+        and "Modèle :" not in resp.text
+    )
     assert 'href="/builder?format=F1&amp;p=X&amp;p=Y&amp;p=Z">Ajouter Z' in resp.text
     assert 'href="/versus?format=F1&amp;a=X&amp;a=Y"' in resp.text
 
@@ -551,23 +573,34 @@ def test_face_a_face(stats_api):
             "log_loss": 0.671,
             "brier": 0.239,
             "accuracy": 0.58,
-            "beats_baseline": True,
+            "elo_log_loss": 0.665,
+            "delta_low": -0.012,
+            "delta_high": -0.001,
+            "teams_help": True,
         },
     }
     resp = client.get(
         "/versus", params={"format": "F1", "a": ["X", "W"], "b": ["Y", "Z"]}
     )
-    assert "<strong>62.0 %</strong> de chances de gagner" in resp.text
+    assert (
+        "À niveau de joueur égal, ton équipe a <strong>62.0 %</strong> de chances"
+        in resp.text
+    )
     assert (
         '<strong class="up">-0.40</strong>' in resp.text
     )  # poids négatif chez l'adversaire : bon pour moi
-    assert "jamais vu en match" in resp.text and "log-loss 0.671" in resp.text
-    assert "pile ou face : le chiffre" not in resp.text
+    assert "jamais vu en match" in resp.text
+    assert (
+        "log-loss 0.671 avec les équipes, 0.665 avec le niveau des joueurs seul, 0.693"
+        in resp.text
+    )
+    assert "entre -0.012 et -0.001" in resp.text
+    assert "pas d'effet mesurable" not in resp.text
     stats_api[0]["http://api/api/predict?format=F1&a=X&b=Y&b=Z"]["model"][
-        "beats_baseline"
+        "teams_help"
     ] = False
     resp = client.get("/versus", params={"format": "F1", "a": "X", "b": ["Y", "Z"]})
-    assert "pile ou face : le chiffre" in resp.text
+    assert "la composition des équipes n'a pas d'effet mesurable" in resp.text
 
 
 def test_face_a_face_sans_modele(stats_api):
