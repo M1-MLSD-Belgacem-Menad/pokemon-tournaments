@@ -10,6 +10,7 @@ from urllib.parse import quote, urlencode, urlsplit
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -57,11 +58,17 @@ async def same_origin_posts(request: Request, call_next):
     return await call_next(request)
 
 
+@app.exception_handler(RequestValidationError)  # ex. /tournaments/abc : 422
 @app.exception_handler(StarletteHTTPException)
-async def error_page(request: Request, exc: StarletteHTTPException):
+async def error_page(request: Request, exc: Exception):
     """Page inconnue ou erreur d'un service : une page du site plutôt que du JSON brut."""
+    code = getattr(exc, "status_code", 422)
     return templates.TemplateResponse(
-        request, "error.html", {"code": exc.status_code}, status_code=exc.status_code
+        request,
+        "error.html",
+        {"code": code},
+        status_code=code,
+        headers=getattr(exc, "headers", None),  # ex. Allow sur un 405
     )
 
 

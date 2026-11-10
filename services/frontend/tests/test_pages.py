@@ -118,7 +118,7 @@ def test_liste_avec_lien_vers_le_detail(api):
     assert resp.status_code == 200
     assert "VGC Test Cup" in resp.text
     assert 'href="/tournaments/1"' in resp.text
-    assert "<strong>92</strong> joueurs inscrits" in resp.text  # chiffres clés
+    assert "<strong>92</strong> participations" in resp.text  # chiffres clés
 
 
 def test_detail_affiche_le_classement_et_l_equipe(api):
@@ -223,6 +223,10 @@ def test_tournoi_inconnu_renvoie_404(api):
 def test_page_inconnue_affiche_la_page_d_erreur():
     resp = client.get("/nimporte-quoi")
     assert resp.status_code == 404 and "Page introuvable" in resp.text
+    resp = client.get("/tournaments/abc")  # identifiant non numérique
+    assert resp.status_code == 422 and "pas le bon format" in resp.text
+    resp = client.get("/logout")  # POST seulement : l'en-tête Allow est gardé
+    assert resp.status_code == 405 and resp.headers["allow"] == "POST"
 
 
 def test_erreur_de_l_api_renvoie_502(api):

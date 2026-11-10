@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% set titles = {404: "Page introuvable", 401: "Session expirée", 502: "Le service des tournois a renvoyé une erreur", 503: "Le service des tournois ne répond pas"} %}
-{% set hints = {404: "Ce tournoi ou cette page n'existe pas, ou plus.", 401: "Reconnecte-toi pour continuer.", 502: "Réessayer dans un instant. Si l'erreur persiste, regarder les journaux du tournament-service.", 503: "Le service démarre peut-être encore : réessayer dans quelques secondes."} %}
+{% set titles = {404: "Page introuvable", 422: "Adresse ou formulaire invalide", 502: "Le service des tournois a renvoyé une erreur", 503: "Le service des tournois ne répond pas"} %}
+{% set hints = {404: "Ce tournoi ou cette page n'existe pas, ou plus.", 422: "Un paramètre de l'adresse ou un champ du formulaire n'a pas le bon format.", 502: "Réessayer dans un instant. Si l'erreur persiste, regarder les journaux du tournament-service.", 503: "Le service démarre peut-être encore : réessayer dans quelques secondes."} %}
 {% block title %}{{ titles.get(code, "Erreur") }}{% endblock %}
 {% block content %}
 <div class="oops">
   <p class="oops-code">{{ code }}</p>
   <h1>{{ titles.get(code, "Erreur") }}</h1>
   <p class="lead">{{ hints.get(code, "Une erreur inattendue s'est produite.") }}</p>
-  <p class="actions"><a class="button" href="/">Retour aux tournois</a>{% if code == 401 %} <a class="button quiet" href="/login">Connexion</a>{% endif %}</p>
+  <p class="actions"><a class="button" href="/">Retour aux tournois</a></p>
 </div>
 {% endblock %}
