@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 
-from app import grpc_server, stats
+from app import grpc_server, matchup, stats
 from app.auth import current_user_id
 from app.db import Conn, connect, migrate
 from app.importer import get_or_create, name_ids, store_import
@@ -27,6 +27,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="tournament-service", lifespan=lifespan)
 app.include_router(stats.router)
+app.include_router(matchup.router)
 
 
 @app.get("/health")

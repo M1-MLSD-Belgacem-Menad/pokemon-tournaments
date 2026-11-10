@@ -22,6 +22,8 @@ from app.db import connect
 from app.main import app
 
 TABLES = [
+    "matchup_weight",
+    "matchup_model",
     "saved_team_pokemon",
     "saved_team",
     "game_match",
