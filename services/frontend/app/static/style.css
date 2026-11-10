@@ -222,6 +222,10 @@ fieldset label { flex-direction: row; align-items: center; gap: 0.5rem; font-wei
 .tag { color: var(--muted); }
 
 /* Créateur d'équipe */
+.team-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.6rem; list-style: none; margin: 0; padding: 0; }
+.team-strip .mon { flex-direction: column; align-items: center; text-align: center; gap: 0.35rem; padding: 0.8rem 0.4rem; box-shadow: var(--shadow); }
+.team-strip a { overflow-wrap: anywhere; }
+.team-strip .types { justify-content: center; }
 .slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; margin: 1rem 0; }
 .toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; }
 .toolbar label { width: 16rem; max-width: 100%; }
@@ -254,6 +258,7 @@ form:has(input[value="winner"]:checked) .entry tbody tr:not(:first-child) { opac
   .roster span, .roster .sprite { width: 40px; height: 40px; } /* 6 sprites sur une ligne */
   .sets { padding-left: 0.8rem; }
   .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .team-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   /* Liste des tournois : une carte par tournoi (nom, puis date, format et joueurs) */
   .tournaments thead { display: none; }
   .tournaments tbody tr { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 0.25rem 0.6rem; padding: 0.75rem 0.9rem; border-bottom: 1px solid var(--line); }

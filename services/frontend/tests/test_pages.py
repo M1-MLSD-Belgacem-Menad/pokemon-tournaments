@@ -487,6 +487,8 @@ def test_builder_affiche_les_winrates(stats_api):
     assert '<a href="/pokemon/X?format=F1">X</a>' in resp.text  # lien vers la fiche
     assert "pas encore chargées depuis PokéAPI" in resp.text  # Y
     assert resp.text.count('class="sprite"') == 1  # X ; Y n'a pas de sprite
+    assert '<li class="mon t-water">' in resp.text  # carte de X dans « Mon équipe »
+    assert '<li class="mon">' in resp.text  # Y, sans type connu : pas de teinte
     assert "Se connecter" in resp.text  # pas connecté : pas d'enregistrement
 
 

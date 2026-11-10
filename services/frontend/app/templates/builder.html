@@ -30,6 +30,16 @@
 </form>
 
 {% if stats is defined %}
+<h2>Mon équipe</h2>
+<ul class="team-strip">
+{% for name in chosen %}{% set p = info.get(name, {}) %}
+  <li class="mon{% if p.types %} t-{{ p.types[0] }}{% endif %}">
+    {% if p.sprite %}<img class="sprite mon-sprite" src="{{ p.sprite }}" alt="" width="64" height="64">{% endif %}
+    <a class="strong" href="/pokemon/{{ name | urlencode }}?format={{ format | urlencode }}">{{ name }}</a>
+    <div class="types">{% for ty in p.types or [] %}<span class="type t-{{ ty }}">{{ ty | type_fr }}</span>{% endfor %}</div>
+  </li>
+{% endfor %}
+</ul>
 <h2>Statistiques de base</h2>
 <div class="scroll">
 <table>
