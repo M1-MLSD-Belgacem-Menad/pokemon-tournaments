@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import types %}
+{% from "_macros.html" import types, reliability %}
 {% block title %}Créer une équipe{% endblock %}
 {% macro pct(r) %}{% if r.winrate is not none %}{{ "%.1f" | format(r.winrate * 100) }} %{% else %}-{% endif %}{% endmacro %}
 {% macro rate(r) %}<td class="num strong rate{% if r.winrate is not none and r.winrate < 0.5 %} low{% endif %}" style="--w: {{ ((r.winrate or 0) * 100) | round(1) }}">{{ pct(r) }}</td>{% endmacro %}
@@ -41,6 +41,22 @@
   </li>
 {% endfor %}
 </ul>
+<p><a class="button" href="/versus?format={{ format | urlencode }}{% for p in chosen %}&amp;a={{ p | urlencode }}{% endfor %}">Tester cette équipe en face-à-face</a></p>
+{% if suggestions %}
+<h2>Pokémon à ajouter</h2>
+<ul class="suggestions">
+{% for s in suggestions %}{% set best = s.partners[0] %}
+  <li class="panel">
+    <span class="mon-name">{% if s.sprite %}<img class="sprite" src="{{ s.sprite }}" alt="" width="40" height="40">{% endif %}{{ s.pokemon }}</span>
+    {% if best.wins + best.losses %}<p>Avec {{ best.partner }} : <strong>{{ "%.0f" | format(100 * best.wins / (best.wins + best.losses)) }} %</strong> de victoires sur {{ best.teams }} équipe{{ "s" if best.teams > 1 }} ({{ "%+.1f" | format(best.delta * 100) }} pts par rapport à son winrate habituel).</p>
+    {% else %}<p class="meta">Jamais joué avec les Pokémon choisis.</p>{% endif %}
+    {% if s.gain is not none %}<p class="meta">Modèle : {{ "%+.1f" | format(s.gain * 100) }} pts de chances de battre une équipe moyenne du format.</p>{% endif %}
+    <a class="button" href="/builder?{{ s.query }}">Ajouter {{ s.pokemon }}</a>
+  </li>
+{% endfor %}
+</ul>
+<p class="meta">Classement : synergie avec les Pokémon déjà choisis (winrate ensemble comparé au winrate habituel, lissé quand il y a peu d'équipes) plus le gain estimé par le modèle de matchup, seulement s'il prédit mieux qu'un pile ou face sur les tournois récents. Un Pokémon n'est proposé qu'après au moins 30 matchs avec l'un des Pokémon choisis.</p>
+{% endif %}
 <h2>Statistiques de base</h2>
 <div class="scroll">
 <table>
@@ -59,11 +75,11 @@
 <h2>Winrate de chaque Pokémon</h2>
 <div class="scroll">
 <table>
-  <thead><tr><th>Pokémon</th><th class="num">Équipes</th><th class="num">Bilan</th><th class="num">Winrate</th><th>Matchups les plus fréquents</th></tr></thead>
+  <thead><tr><th>Pokémon</th><th class="num">Équipes</th><th class="num">Bilan</th><th class="num">Winrate</th><th>Fiabilité</th><th>Matchups les plus fréquents</th></tr></thead>
   <tbody>
   {% for r in stats %}
     <tr>
-      <td class="strong">{{ r.pokemon }}</td><td class="num">{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td>{{ rate(r) }}
+      <td class="strong">{{ r.pokemon }}</td><td class="num">{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td>{{ rate(r) }}<td>{{ reliability(r) }}</td>
       <td><div class="matchups">{% for m in matchups[r.pokemon] %}<span>{{ m.opponent }} {{ pct(m) }} ({{ m.games }})</span>{% else %}<span class="meta">aucun</span>{% endfor %}</div></td>
     </tr>
   {% endfor %}
@@ -74,16 +90,16 @@
 {% if pairs %}
 <div class="scroll">
 <table>
-  <thead><tr><th>Paire</th><th class="num">Équipes</th><th class="num">Bilan</th><th class="num">Winrate</th></tr></thead>
+  <thead><tr><th>Paire</th><th class="num">Équipes</th><th class="num">Bilan</th><th class="num">Winrate</th><th>Fiabilité</th></tr></thead>
   <tbody>
   {% for r in pairs %}
-    <tr><td>{{ r.pokemon1 }} + {{ r.pokemon2 }}</td><td class="num">{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td>{{ rate(r) }}</tr>
+    <tr><td>{{ r.pokemon1 }} + {{ r.pokemon2 }}</td><td class="num">{{ r.teams }}</td><td class="num">{{ r.wins }}-{{ r.losses }}</td>{{ rate(r) }}<td>{{ reliability(r) }}</td></tr>
   {% endfor %}
   </tbody>
 </table>
 </div>
 {% else %}<p class="meta">Aucune équipe n'a joué ces Pokémon ensemble.</p>{% endif %}
-<p class="meta">Winrate = victoires / (victoires + défaites) des joueurs de tous les tournois scrapés du format. Matchups : matchs dont les deux équipes sont connues, avec le nombre de matchs entre parenthèses.</p>
+<p class="meta">Winrate = victoires / (victoires + défaites) des joueurs de tous les tournois scrapés du format. Fiabilité : intervalle de confiance à 95 % (Wilson) ; « peu de données » sous 30 matchs. Matchups : matchs dont les deux équipes sont connues, avec le nombre de matchs entre parenthèses.</p>
 
 {% if teams is not none %}
 <form method="post" action="/builder/save" class="save">

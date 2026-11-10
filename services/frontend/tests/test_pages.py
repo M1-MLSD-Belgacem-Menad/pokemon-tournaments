@@ -433,7 +433,16 @@ def stats_api(monkeypatch):
         "http://api/api/formats": [{"code": "F1", "name": "F1", "tournaments": 3}],
         "http://api/api/formats/F1/legal-pokemon": ["X", "Y", "Z"],
         f"http://api/api/stats/pokemon?{q}": [
-            {"pokemon": "X", "teams": 2, "wins": 5, "losses": 1, "winrate": 0.8333},
+            {
+                "pokemon": "X",
+                "teams": 2,
+                "wins": 5,
+                "losses": 1,
+                "winrate": 0.8333,
+                "ci_low": 0.4365,
+                "ci_high": 0.9699,
+                "low_data": True,
+            },
             {"pokemon": "Y", "teams": 2, "wins": 2, "losses": 3, "winrate": 0.4},
         ],
         f"http://api/api/stats/combinations?{q}": [
@@ -463,6 +472,16 @@ def stats_api(monkeypatch):
         ],
         "http://api/api/teams": [
             {"id": 1, "name": "Ma team", "format": "F1", "pokemon": ["X", "Y"]}
+        ],
+        f"http://api/api/suggestions?{q}": [
+            {
+                "pokemon": "Z",
+                "sprite": None,
+                "gain": 0.031,
+                "partners": [
+                    {"partner": "X", "teams": 4, "wins": 9, "losses": 3, "delta": 0.052}
+                ],
+            }
         ],
     }
     monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses, sent))
@@ -494,6 +513,67 @@ def test_builder_affiche_les_winrates(stats_api):
     assert '<li class="mon t-water">' in resp.text  # carte de X dans « Mon équipe »
     assert '<li class="mon">' in resp.text  # Y, sans type connu : pas de teinte
     assert "Se connecter" in resp.text  # pas connecté : pas d'enregistrement
+
+
+def test_builder_fiabilite_et_suggestions(stats_api):
+    resp = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]})
+    assert (
+        '44–97 %</span> <span class="tag low-data">peu de données</span>' in resp.text
+    )
+    assert (
+        "Avec X : <strong>75 %</strong> de victoires sur 4 équipes (+5.2 pts"
+        in resp.text
+    )
+    assert "Modèle : +3.1 pts" in resp.text
+    assert 'href="/builder?format=F1&amp;p=X&amp;p=Y&amp;p=Z">Ajouter Z' in resp.text
+    assert 'href="/versus?format=F1&amp;a=X&amp;a=Y"' in resp.text
+
+
+def test_builder_sans_suggestions_si_l_api_echoue(stats_api):
+    stats_api[0]["http://api/api/suggestions?format=F1&pokemon=X&pokemon=Y"] = 502
+    resp = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]})
+    assert resp.status_code == 200 and "Pokémon à ajouter" not in resp.text
+
+
+def test_face_a_face(stats_api):
+    stats_api[0]["http://api/api/predict?format=F1&a=X&b=Y&b=Z"] = {
+        "probability": 0.62,
+        "pokemon": [
+            {"pokemon": "Y", "side": "b", "weight": -0.4, "known": True},
+            {"pokemon": "X", "side": "a", "weight": 0.1, "known": True},
+            {"pokemon": "Z", "side": "b", "weight": 0, "known": False},
+        ],
+        "model": {
+            "trained_at": "2026-11-10T07:00:00",
+            "train_matches": 900,
+            "test_matches": 200,
+            "c": 0.1,
+            "log_loss": 0.671,
+            "brier": 0.239,
+            "accuracy": 0.58,
+            "beats_baseline": True,
+        },
+    }
+    resp = client.get(
+        "/versus", params={"format": "F1", "a": ["X", "W"], "b": ["Y", "Z"]}
+    )
+    assert "<strong>62.0 %</strong> de chances de gagner" in resp.text
+    assert (
+        '<strong class="up">-0.40</strong>' in resp.text
+    )  # poids négatif chez l'adversaire : bon pour moi
+    assert "jamais vu en match" in resp.text and "log-loss 0.671" in resp.text
+    assert "pile ou face : le chiffre" not in resp.text
+    stats_api[0]["http://api/api/predict?format=F1&a=X&b=Y&b=Z"]["model"][
+        "beats_baseline"
+    ] = False
+    resp = client.get("/versus", params={"format": "F1", "a": "X", "b": ["Y", "Z"]})
+    assert "pile ou face : le chiffre" in resp.text
+
+
+def test_face_a_face_sans_modele(stats_api):
+    stats_api[0]["http://api/api/predict?format=F1&a=X&b=Y"] = 404
+    resp = client.get("/versus", params={"format": "F1", "a": "X", "b": "Y"})
+    assert resp.status_code == 200 and "pas encore entraîné" in resp.text
 
 
 def test_builder_connecte_montre_mes_equipes(stats_api):

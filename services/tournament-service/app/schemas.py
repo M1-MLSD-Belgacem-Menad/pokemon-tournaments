@@ -1,4 +1,5 @@
 import datetime
+import math
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints, model_validator
@@ -99,6 +100,8 @@ class LocalTournament(BaseModel):
 
 
 STATS = ("hp", "atk", "def", "spa", "spd", "spe")  # ordre des statistiques de base
+# Référence du modèle de matchup : prédire toujours 50 % (docs/07-apprentissage.md).
+BASELINE_LOG_LOSS, BASELINE_BRIER = math.log(2), 0.25
 SPRITE_URL = r"^https://raw\.githubusercontent\.com/PokeAPI/sprites/master/sprites/pokemon/[\w/-]+\.png$"
 
 

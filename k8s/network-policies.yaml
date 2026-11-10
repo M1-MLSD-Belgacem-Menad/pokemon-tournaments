@@ -23,6 +23,8 @@ spec:
             matchLabels: { app: tournament-service }
         - podSelector:
             matchLabels: { app: user-service }
+        - podSelector:
+            matchLabels: { app: entrainement }  # CronJob du modèle de matchup
       ports:
         - port: 3306
 ---

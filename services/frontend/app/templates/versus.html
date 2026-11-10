@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Face-à-face{% endblock %}
+{% macro team(side, chosen, label) %}
+<fieldset class="panel">
+  <legend>{{ label }}</legend>
+  {% for i in range(size) %}
+  <select name="{{ side }}" aria-label="{{ label }}, Pokémon {{ i + 1 }}">
+    <option value="">Pokémon {{ i + 1 }}</option>
+    {% for name in legal %}<option{% if chosen[i] == name %} selected{% endif %}>{{ name }}</option>{% endfor %}
+  </select>
+  {% endfor %}
+</fieldset>
+{% endmacro %}
+{% block content %}
+<h1>Face-à-face</h1>
+{% if not formats %}
+<p class="panel">Aucun tournoi en base : lancer le scraper d'abord.</p>
+{% else %}
+<p class="lead">Choisir deux équipes pour voir laquelle a le plus de chances de gagner, selon un modèle entraîné sur les matchs des tournois scrapés.</p>
+<form method="get" action="/versus">
+  <label>Format
+    <select name="format">
+    {% for f in formats %}<option value="{{ f.code }}"{% if f.code == format %} selected{% endif %}>{{ f.code }} ({{ f.tournaments }} tournois)</option>{% endfor %}
+    </select>
+  </label>
+  <div class="versus">{{ team("a", a, "Ton équipe") }}{{ team("b", b, "Adversaire") }}</div>
+  <button>Prédire le résultat</button>
+</form>
+
+{% if no_model %}
+<p class="panel">Le modèle de ce format n'est pas encore entraîné (assez de matchs nécessaires, entraînement chaque nuit).</p>
+{% elif prediction %}{% set pct = (prediction.probability * 100) | round(1) %}{% set m = prediction.model %}
+{% if not m.beats_baseline %}<p class="error" role="status">Sur les tournois les plus récents, ce modèle ne prédit pas mieux qu'un pile ou face : le chiffre ci-dessous est indicatif.</p>{% endif %}
+<section class="panel proba">
+  <p>Ton équipe a <strong>{{ pct }} %</strong> de chances de gagner.</p>
+  <div class="duel" style="--pct: {{ pct }}%" role="img" aria-label="{{ pct }} % contre {{ (100 - pct) | round(1) }} %"></div>
+  <h2>Ce qui pèse le plus</h2>
+  <ul class="weights">
+  {% for r in prediction.pokemon[:6] %}
+    <li><span>{{ r.pokemon }} <span class="meta">({{ "ton équipe" if r.side == "a" else "adversaire" }})</span></span>
+    {% if r.known %}<strong class="{{ 'up' if (r.weight > 0) == (r.side == 'a') else 'down' }}">{{ "%+.2f" | format(r.weight) }}</strong>{% else %}<span class="meta">jamais vu en match</span>{% endif %}</li>
+  {% endfor %}
+  </ul>
+</section>
+<p class="meta">Régression logistique : un poids par Pokémon, la probabilité vient de la différence entre les sommes des poids des deux équipes. Entraîné le {{ m.trained_at[:10] }} ; sur les {{ m.test_matches }} matchs des tournois les plus récents, gardés pour le test : log-loss {{ "%.3f" | format(m.log_loss) }} (0.693 pour un pile ou face), score de Brier {{ "%.3f" | format(m.brier) }} (0.25), bon vainqueur dans {{ (m.accuracy * 100) | round | int }} % des cas. Le niveau des joueurs n'est pas pris en compte : c'est une tendance, pas une certitude.</p>
+{% endif %}
+{% endif %}
+{% endblock %}

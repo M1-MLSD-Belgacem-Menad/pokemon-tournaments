@@ -1,0 +1,48 @@
+# Réentraînement quotidien du modèle de matchup (docs/07-apprentissage.md), une heure après le scraper.
+# Lancement à la main : kubectl -n pokemon create job --from=cronjob/entrainement entrainement-manuel
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: entrainement
+spec:
+  schedule: "0 7 * * *"
+  timeZone: Europe/Paris
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0  # en cas d'échec, l'ancien modèle reste en base jusqu'au lendemain
+      template:
+        metadata:
+          labels:
+            app: entrainement  # autorisé à joindre MySQL (k8s/network-policies.yaml)
+        spec:
+          restartPolicy: Never
+          serviceAccountName: tournament-service  # même image et même base, aucun droit Kubernetes
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: entrainement
+              image: pokemon-tournament  # même image que l'API, autre commande
+              command: [".venv/bin/python", "-m", "app.train"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: [ALL] }
+              # scikit-learn et la matrice creuse des matchs : quelques dizaines de Mo pour 300 tournois.
+              resources:
+                requests: { cpu: 100m, memory: 128Mi }
+                limits: { cpu: 1, memory: 512Mi }
+              env:
+                - name: DB_HOST
+                  value: mysql
+                - name: DB_NAME
+                  value: tournament_db
+                - name: DB_USER
+                  valueFrom:
+                    secretKeyRef: { name: app-secrets, key: TOURNAMENT_DB_USER }
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef: { name: app-secrets, key: TOURNAMENT_DB_PASSWORD }

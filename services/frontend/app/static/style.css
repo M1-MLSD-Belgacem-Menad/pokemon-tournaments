@@ -287,3 +287,21 @@ form:has(input[value="winner"]:checked) .entry tbody tr:not(:first-child) { opac
 /* Page d'erreur : grand code d'état, message, retour à l'accueil */
 .oops { max-width: 34rem; margin: 3rem auto; text-align: center; }
 .oops-code { margin: 0; font-size: 4.5rem; font-weight: 800; line-height: 1; letter-spacing: -0.04em; color: var(--accent); }
+
+/* Fiabilité des winrates */
+.ci { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+.low-data { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+
+/* Suggestions du créateur et face-à-face */
+.suggestions { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.8rem; list-style: none; margin: 0; padding: 0; }
+.suggestions li { display: flex; flex-direction: column; gap: 0.4rem; }
+.suggestions p { margin: 0; font-size: 0.9rem; }
+.suggestions .button { margin-top: auto; align-self: start; }
+.versus { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; margin: 1rem 0; }
+.versus fieldset { display: grid; gap: 0.5rem; margin: 0; }
+.proba > p { font-size: 1.3rem; margin: 0 0 0.6rem; }
+.duel { height: 0.8rem; border-radius: 999px; background: linear-gradient(to right, var(--win) var(--pct), var(--accent) var(--pct)); }
+.weights { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.3rem; }
+.weights li { display: flex; justify-content: space-between; gap: 1rem; }
+.weights .up { color: var(--ok); }
+.weights .down { color: var(--accent); }

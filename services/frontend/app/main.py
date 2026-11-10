@@ -274,6 +274,27 @@ def pokemon(request: Request, name: str, format: str | None = None):
     return templates.TemplateResponse(request, "pokemon.html", ctx)
 
 
+def clean_team(team: list[str], legal: list[str]) -> list[str]:
+    """Sans doublon ni case vide, et légaux dans ce format (il a pu changer depuis le choix)."""
+    allowed = set(legal)
+    return list(dict.fromkeys(p for p in team if p in allowed))[:TEAM_SIZE]
+
+
+def suggestions(fmt: str, chosen: list[str]) -> list[dict] | None:
+    """Pokémon à ajouter à l'équipe (API), avec le lien qui l'ajoute ; None si l'API échoue."""
+    try:
+        rows = api_get(
+            f"/api/suggestions?{urlencode({'format': fmt, 'pokemon': chosen}, doseq=True)}"
+        )
+    except HTTPException:  # section facultative : le reste du créateur s'affiche
+        return None
+    for r in rows:
+        r["query"] = urlencode(
+            {"format": fmt, "p": [*chosen, r["pokemon"]]}, doseq=True
+        )
+    return rows
+
+
 def builder_page(request: Request, fmt: str | None, chosen: list[str], **extra):
     """Créateur d'équipe : Pokémon légaux du format, puis winrates des Pokémon et des paires choisis."""
     formats = api_get("/api/formats")
@@ -289,10 +310,7 @@ def builder_page(request: Request, fmt: str | None, chosen: list[str], **extra):
     }
     if fmt:
         ctx["legal"] = api_get(f"/api/formats/{quote(fmt, safe='')}/legal-pokemon")
-        # Sans doublon ni case vide, et légaux dans ce format (il a pu changer depuis le choix).
-        legal = set(ctx["legal"])
-        chosen = list(dict.fromkeys(p for p in chosen if p in legal))[:TEAM_SIZE]
-        ctx["chosen"] = chosen
+        ctx["chosen"] = chosen = clean_team(chosen, ctx["legal"])
         q = urlencode({"format": fmt, "pokemon": chosen}, doseq=True)
         if chosen:
             ctx["info"] = {
@@ -309,6 +327,8 @@ def builder_page(request: Request, fmt: str | None, chosen: list[str], **extra):
                 )
                 for p in chosen
             }
+            if len(chosen) < TEAM_SIZE:
+                ctx["suggestions"] = suggestions(fmt, chosen)
     if token := request.cookies.get("token"):
         try:
             ctx["teams"] = api_get("/api/teams", token)
@@ -350,6 +370,36 @@ async def save_team(request: Request):
     return await run_in_threadpool(
         builder_page, request, fmt, chosen, error=error, status_code=code
     )
+
+
+@app.get("/versus", response_class=HTMLResponse)
+def versus(
+    request: Request,
+    format: str | None = None,
+    a: Annotated[list[str], Query()] = [],  # noqa: B006
+    b: Annotated[list[str], Query()] = [],  # noqa: B006
+):
+    """Face-à-face : probabilité que l'équipe A batte l'équipe B selon le modèle de matchup."""
+    formats = api_get("/api/formats")
+    fmt = format or (formats[0]["code"] if formats else None)
+    ctx = {"formats": formats, "format": fmt, "size": TEAM_SIZE, "a": [], "b": []}
+    if fmt:
+        ctx["legal"] = legal = api_get(
+            f"/api/formats/{quote(fmt, safe='')}/legal-pokemon"
+        )
+        a, b = clean_team(a, legal), clean_team(b, legal)
+        ctx |= {"a": a, "b": b}
+        if a and b:
+            q = urlencode({"format": fmt, "a": a, "b": b}, doseq=True)
+            try:
+                ctx["prediction"] = api_get(f"/api/predict?{q}")
+            except HTTPException as e:
+                if e.status_code != 404:
+                    raise
+                ctx["no_model"] = (
+                    True  # le CronJob d'entraînement n'est pas encore passé
+                )
+    return templates.TemplateResponse(request, "versus.html", ctx)
 
 
 @app.get("/login", response_class=HTMLResponse)

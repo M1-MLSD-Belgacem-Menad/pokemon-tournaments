@@ -26,6 +26,7 @@
       <nav>
         {{ link("/", "Tournois", path.startswith("/tournaments/") and path != "/tournaments/new") }}
         {{ link("/builder", "Créer une équipe") }}
+        {{ link("/versus", "Face-à-face") }}
       {% if request.cookies.token %}
         {{ link("/tournaments/new", "Saisir un tournoi") }}
         <form method="post" action="/logout"><button class="quiet">Déconnexion</button></form>
