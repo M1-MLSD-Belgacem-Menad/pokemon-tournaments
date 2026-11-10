@@ -175,7 +175,7 @@ CREATE TABLE app_user (
 - **Winrate par matchup** : à partir de `game_match`, on compare l'équipe du vainqueur et celle du perdant (Pokémon contre Pokémon). Tous les joueurs et tous les matchs du tournoi sont enregistrés, pour que les winrates ne viennent pas que des joueurs qui ont gagné. Seuls les matchs dont les deux joueurs ont publié leur équipe comptent.
 - **[Reco]** Calcul en SQL (requêtes ou vues) à la demande. Une table de cache ne se justifie que si c'est mesurablement lent.
 - **Fiabilité** : chaque winrate est accompagné d'un intervalle de confiance de Wilson à 95 %, d'une version lissée (prior Beta(5, 5)) et d'un drapeau « peu de données » sous 30 matchs.
-- **Modèle de matchup** : une régression logistique par format, un poids par Pokémon, entraînée chaque nuit par le CronJob `entrainement` (même image que le `tournament-service`) et stockée dans `matchup_model` et `matchup_weight` (migration 012). L'API prédit en additionnant les poids, sans scikit-learn. Détails : [07-apprentissage.md](07-apprentissage.md).
+- **Modèle de matchup** : par format, le niveau des joueurs (Elo) en décalage fixe puis un poids par Pokémon (régression logistique écrite avec NumPy et SciPy), entraîné chaque nuit par le CronJob `entrainement` (même image que le `tournament-service`) et stocké dans `matchup_model` et `matchup_weight` (migrations 012 et 013). L'API prédit en additionnant les poids. Les suggestions du créateur viennent de la co-occurrence des Pokémon dans les équipes du format. Détails : [07-apprentissage.md](07-apprentissage.md).
 
 ## 4. Flux de données
 

@@ -15,7 +15,7 @@ Application web autour des résultats de tournois Pokémon : recensement des tou
 | [04-guide-de-contribution.md](04-guide-de-contribution.md) | Workflow GitHub, conventions de code, de commit et de test |
 | [05-checklist-conformite.md](05-checklist-conformite.md) | Liste à cocher avant le rendu |
 | [06-plan-par-etapes.md](06-plan-par-etapes.md) | Les 13 étapes de réalisation, avec résultat attendu et critère de réussite |
-| [07-apprentissage.md](07-apprentissage.md) | Winrates fiables, modèle de prédiction des matchs, suggestions du créateur : méthode, résultats, limites |
+| [07-apprentissage.md](07-apprentissage.md) | Winrates fiables, suggestions du créateur, effet des équipes à niveau égal : méthode, résultats, limites |
 | [rapport/rapport.md](rapport/rapport.md) | Mini rapport du rendu : paliers atteints, architecture, captures d'écran |
 
 ## Fonctionnalités
