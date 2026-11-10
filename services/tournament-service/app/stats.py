@@ -1,9 +1,12 @@
 """Statistiques de l'étape 3, calculées en SQL à la demande (pas de cache tant que ce n'est pas lent).
 
 Winrate = victoires / (victoires + défaites) ; les nuls ne comptent pas. Seuls les tournois scrapés
-ont des bilans : les tournois locaux (sans bilan) n'entrent pas dans les calculs.
+ont des bilans : les tournois locaux (sans bilan) n'entrent pas dans les calculs. Chaque winrate est
+accompagné d'une version lissée, d'un intervalle de confiance et d'un drapeau « peu de données »
+(docs/07-apprentissage.md).
 """
 
+import math
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,11 +29,39 @@ def split_types(types: str | None) -> list[str]:
     return types.split(",") if types else []
 
 
+PRIOR_GAMES = (
+    10  # lissage : chaque winrate part de 10 matchs fictifs à 50 % (prior Beta(5, 5))
+)
+LOW_DATA = 30  # en dessous de 30 matchs, le winrate est signalé « peu de données »
+
+
+def wilson(wins: int, games: int, z: float = 1.96) -> tuple[float, float]:
+    """Intervalle de confiance à 95 % de Wilson sur une proportion (correct même près de 0 ou 1)."""
+    p = wins / games
+    center = (p + z * z / (2 * games)) / (1 + z * z / games)
+    half = (
+        z
+        * math.sqrt(p * (1 - p) / games + z * z / (4 * games * games))
+        / (1 + z * z / games)
+    )
+    return center - half, center + half
+
+
+def smoothed(wins: int, games: int) -> float:
+    """Winrate tiré vers 50 % quand il y a peu de matchs : (V + 5) / (N + 10)."""
+    return (wins + PRIOR_GAMES / 2) / (games + PRIOR_GAMES)
+
+
 def winrate(row: dict) -> dict:
+    """Ajoute à une ligne (wins, losses) le winrate brut, lissé, son intervalle et le drapeau peu de données."""
     # SUM() renvoie un Decimal, que le JSON écrirait en texte.
     row["wins"], row["losses"] = int(row["wins"] or 0), int(row["losses"] or 0)
     games = row["wins"] + row["losses"]
     row["winrate"] = round(row["wins"] / games, 4) if games else None
+    row["winrate_smoothed"] = round(smoothed(row["wins"], games), 4)
+    low, high = wilson(row["wins"], games) if games else (0.0, 1.0)
+    row["ci_low"], row["ci_high"] = round(low, 4), round(high, 4)
+    row["low_data"] = games < LOW_DATA
     return row
 
 

@@ -188,3 +188,23 @@ def test_pokemon_page_not_played_404(client, data, name, fmt):
         client.get(f"/api/stats/pokemon/{name}", params={"format": fmt}).status_code
         == 404
     )
+
+
+def test_reliable_winrate_fields():
+    from app.stats import winrate
+
+    few = winrate({"wins": 2, "losses": 0})  # 100 % sur 2 matchs : très incertain
+    assert few["winrate"] == 1 and few["winrate_smoothed"] == pytest.approx(
+        7 / 12, abs=1e-4
+    )
+    assert few["ci_low"] == pytest.approx(0.342, abs=1e-3) and few[
+        "ci_high"
+    ] == pytest.approx(1)
+    assert few["low_data"]
+    many = winrate({"wins": 58, "losses": 42})
+    assert (many["ci_low"], many["ci_high"]) == pytest.approx((0.482, 0.672), abs=1e-3)
+    assert not many["low_data"]
+    none = winrate({"wins": None, "losses": None})
+    assert (
+        none["winrate"] is None and none["winrate_smoothed"] == 0.5 and none["low_data"]
+    )
