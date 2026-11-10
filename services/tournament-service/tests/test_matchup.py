@@ -1,4 +1,8 @@
 import itertools
+import os
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -113,10 +117,35 @@ def test_suggestions_without_model_use_synergy_only(client, data):
     assert all(r["gain"] is None for r in rows) and "A" not in [
         r["pokemon"] for r in rows
     ]
-    assert {r["pokemon"] for r in rows} == {"B", "C", "D", "Fort", "Faible"}
+    # C n'est jamais dans une équipe avec A : ce n'est pas une suggestion de synergie.
+    assert {r["pokemon"] for r in rows} == {"B", "D", "Fort", "Faible"}
 
 
 def test_predict_counts_a_duplicate_once(client, model):
     once = client.get("/api/predict?format=F1&a=Fort&b=A").json()
     twice = client.get("/api/predict?format=F1&a=Fort&a=Fort&b=A").json()
     assert once["probability"] == twice["probability"]
+
+
+def test_training_needs_only_the_database_settings():
+    # Le CronJob ne reçoit que les DB_* : l'entraînement ne doit pas importer le code de l'API (JWT_SECRET).
+    env = {k: v for k, v in os.environ.items() if k != "JWT_SECRET"}
+    here = Path(__file__).parent.parent
+    subprocess.run(
+        [sys.executable, "-c", "import app.train"], env=env, cwd=here, check=True
+    )
+
+
+def test_model_worse_than_baseline_is_flagged_and_not_used(client, model, db):
+    with db.cursor() as cur:
+        cur.execute("UPDATE matchup_model SET log_loss = 0.75")
+    db.commit()
+    assert client.get("/api/model?format=F1").json()["beats_baseline"] is False
+    assert (
+        client.get("/api/predict?format=F1&a=Fort&b=A").json()["model"][
+            "beats_baseline"
+        ]
+        is False
+    )
+    rows = client.get("/api/suggestions?format=F1&pokemon=A").json()
+    assert all(r["gain"] is None for r in rows)

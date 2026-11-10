@@ -10,8 +10,9 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query
 
 from app.db import Conn
+from app.schemas import BASELINE_BRIER, BASELINE_LOG_LOSS
 from app.stats import (
-    PRIOR_GAMES,
+    LOW_DATA,
     in_names,
     legal_pokemon,
     pokemon_info,
@@ -21,8 +22,11 @@ from app.stats import (
 
 router = APIRouter()
 Team = Annotated[list[str], Query(min_length=1, max_length=6)]
-BASELINE_LOG_LOSS, BASELINE_BRIER = math.log(2), 0.25  # prédire toujours 50 %
 TEAM_SIZE = 6
+# Lissage des winrates de paires : 50 matchs fictifs (environ 7 équipes) au winrate habituel du candidat.
+# Plus fort que celui des winrates simples (10) : les bilans d'équipes portent aussi le niveau des joueurs,
+# et une paire jouée par 9 équipes passait sinon devant une paire jouée par 40 (mesuré sur 94 tournois).
+SYNERGY_PRIOR = 50
 METRICS = (
     "trained_at",
     "train_matches",
@@ -31,6 +35,7 @@ METRICS = (
     "log_loss",
     "brier",
     "accuracy",
+    "beats_baseline",
 )
 
 
@@ -47,6 +52,8 @@ def load_model(cur, format_code: str) -> tuple[dict, dict[str, float]]:
     model = cur.fetchone()
     if not model:
         raise HTTPException(404, f"pas encore de modèle pour {format_code}")
+    # Sur les tournois récents, le modèle fait-il mieux que « toujours 50 % » ? Sinon l'interface le dit.
+    model["beats_baseline"] = model["log_loss"] < BASELINE_LOG_LOSS
     cur.execute(
         "SELECT pk.name, w.weight FROM matchup_weight w JOIN pokemon pk ON pk.id = w.pokemon_id"
         " WHERE w.format_id = %s",
@@ -126,8 +133,10 @@ def suggestions(
 
     score = synergie + gain :
     - synergie : écart moyen, sur les Pokémon choisis, entre le winrate du candidat joué avec chacun
-      et son winrate en général (lissés tous les deux ; sans match ensemble, l'écart vaut 0) ;
-    - gain : hausse de la probabilité de battre une équipe moyenne du format selon le modèle (0 sans modèle).
+      et son winrate en général (lissés tous les deux ; sous 30 matchs ensemble, l'écart vaut 0).
+      Un candidat qui n'a 30 matchs avec aucun Pokémon choisi n'est pas proposé ;
+    - gain : hausse de la probabilité de battre une équipe moyenne du format selon le modèle (0 sans modèle,
+      ou si le modèle ne fait pas mieux que la prédiction constante 50 % sur les tournois récents).
       Les places encore vides comptent comme des Pokémon moyens du format, pour comparer des équipes de six.
     """
     chosen = list(dict.fromkeys(pokemon))
@@ -136,6 +145,10 @@ def suggestions(
         try:
             model, weights = load_model(cur, format)
         except HTTPException:
+            model, weights = None, {}
+        if (
+            model and not model["beats_baseline"]
+        ):  # un modèle pas meilleur que 50 % ne classe rien
             model, weights = None, {}
         pairs = pair_stats(cur, format, chosen)
     alone = (
@@ -162,12 +175,18 @@ def suggestions(
         for p in chosen:
             r = together.get((c, p))
             wins, losses = (int(r["wins"] or 0), int(r["losses"] or 0)) if r else (0, 0)
+            if (
+                wins + losses < LOW_DATA
+            ):  # quelques équipes ne prouvent rien : pas de synergie mesurée
+                r, wins, losses = None, 0, 0
             # Lissé vers le winrate du candidat seul : sans matchs ensemble, aucune synergie.
-            wr = (wins + PRIOR_GAMES * base) / (wins + losses + PRIOR_GAMES)
+            wr = (wins + SYNERGY_PRIOR * base) / (wins + losses + SYNERGY_PRIOR)
             partners.append(
                 {"partner": p, "teams": r["teams"] if r else 0, "wins": wins, "losses": losses,
                  "delta": wr - base}
             )  # fmt: skip
+        if not any(x["wins"] + x["losses"] for x in partners):
+            continue  # jamais assez joué avec l'équipe : ce n'est pas une suggestion de synergie
         synergy = sum(x["delta"] for x in partners) / len(partners)
         gain = (
             sigmoid(team_score + weights.get(c, 0) - field / TEAM_SIZE)

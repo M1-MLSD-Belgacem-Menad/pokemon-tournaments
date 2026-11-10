@@ -14,7 +14,8 @@
 
 1. **Tournois réels** : un scraper récupère chaque jour les tournois VGC (doubles, règlement en vigueur) de play.limitlesstcg.com. Il enregistre tous les joueurs, leurs équipes et tous les matchs. Le site affiche le top 16 avec les équipes complètes : objets, talents, attaques, types, statistiques et sprites. Les drapeaux des joueurs sont affichés à côté de leur nom.
 2. **Espace utilisateur** : inscription, connexion (jeton JWT dans un cookie `HttpOnly`), saisie d'un tournoi local au niveau « vainqueur seul » ou « top 16 ».
-3. **Créateur d'équipes** : seuls les Pokémon joués dans le format courant sont proposés. Pour chaque Pokémon et chaque paire, le site affiche le winrate calculé sur tous les matchs enregistrés, avec les matchups les plus fréquents. L'utilisateur peut enregistrer son équipe.
+3. **Créateur d'équipes** : seuls les Pokémon joués dans le format courant sont proposés. Pour chaque Pokémon et chaque paire, le site affiche le winrate calculé sur tous les matchs enregistrés, avec les matchups les plus fréquents. L'utilisateur peut enregistrer son équipe. Chaque winrate est affiché avec son intervalle de confiance et un badge « peu de données » quand il repose sur moins de 30 matchs. Le créateur propose les trois Pokémon qui complètent le mieux l'équipe, avec la raison de chaque proposition.
+4. **Prédiction de matchs** : un modèle de régression logistique, réentraîné chaque nuit par un CronJob, estime la probabilité qu'une équipe en batte une autre (page Face-à-face). Il est évalué sur les tournois les plus récents, contre une prédiction naïve à 50 %.
 
 ## 2. Paliers du sujet
 
@@ -154,7 +155,23 @@ L'application servie depuis GKE, avec l'adresse de l'équilibreur de charge.
 - **Gateway** : ingress-nginx n'est plus maintenu (dépôt archivé, dernière version `controller-v1.15.1` en mars 2026). C'est le seul composant exposé, et il ne recevra plus de correctifs de sécurité. Le remplacer par une implémentation de Gateway API serait la suite logique.
 - **Images externes** : sprites (dépôt GitHub de PokéAPI) et drapeaux (flagcdn.com) sont chargés par le navigateur. Une URL de sprite qui ne vient pas de PokéAPI est refusée.
 
-## 8. Labs Google **[À compléter]**
+## 8. Apprentissage : winrates fiables et prédiction des matchs
+
+Méthode complète, formules et limites : [`docs/07-apprentissage.md`](../07-apprentissage.md).
+
+- **Données** : les matchs des tournois scrapés dont les deux équipes sont connues. Au 10 novembre, la base minikube (24 tournois) était trop petite pour un modèle. Un téléchargement ponctuel de 94 tournois récents a donné 7 879 matchs utilisables au format courant.
+- **Winrates fiables** : intervalle de Wilson à 95 %, winrate lissé par un prior Beta(5, 5) pour les classements, badge « peu de données » sous 30 matchs. Un 2-0 n'est plus présenté comme « 100 % » sans nuance : il s'affiche « 34–100 % · peu de données ».
+- **Modèle** : régression logistique sans constante sur un vecteur +1/−1 par Pokémon. P(A bat B) ne dépend que de la différence des sommes des poids, donc P(B bat A) = 1 − P(A bat B). La force de régularisation est choisie sur une validation chronologique.
+- **Évaluation** : les 20 % de tournois les plus récents servent de test.
+
+  Sur 18 tournois de test (1 087 matchs), le modèle fait 0,698 de log-loss contre 0,693 pour la prédiction constante de 50 %, et 50 % de bons vainqueurs : **il ne bat pas la référence**. Sur les données d'entraînement, il atteint 59 %. Ce qu'il apprend ne se généralise donc pas. Explication probable : les rondes suisses apparient des joueurs de même bilan, et le niveau des joueurs, absent du modèle, compte plus que la composition de l'équipe.
+  L'application en tient compte : le modèle n'est utilisé que s'il bat la référence (`beats_baseline`). Sinon, la page Face-à-face affiche un avertissement, et les suggestions se fondent sur la synergie seule. Ces synergies de paires se retrouvent faiblement d'une moitié des tournois à l'autre (corrélation de 0,15).
+
+- **Mise en production** : l'entraînement tourne dans un CronJob Kubernetes avec la même image que le `tournament-service`, et écrit les poids dans MySQL. L'API prédit en additionnant des poids, sans scikit-learn, et toutes ses répliques lisent le même modèle.
+- **Suggestions du créateur** : score = synergie avec les Pokémon déjà choisis (winrate ensemble comparé au winrate habituel du candidat, lissé) + gain de probabilité estimé par le modèle.
+- **Limites** : le niveau des joueurs n'est pas modélisé, alors qu'il compte au moins autant que l'équipe. Le modèle additif ne voit pas les contres entre deux Pokémon. Les données viennent d'un seul site de tournois en ligne.
+
+## 9. Labs Google **[À compléter]**
 
 - Captures du profil Skills Boost de chaque membre du binôme (colonne MLSD).
 - Rapports sur les deux derniers labs.

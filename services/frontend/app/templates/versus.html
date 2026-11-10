@@ -30,6 +30,7 @@
 {% if no_model %}
 <p class="panel">Le modèle de ce format n'est pas encore entraîné (assez de matchs nécessaires, entraînement chaque nuit).</p>
 {% elif prediction %}{% set pct = (prediction.probability * 100) | round(1) %}{% set m = prediction.model %}
+{% if not m.beats_baseline %}<p class="error" role="status">Sur les tournois les plus récents, ce modèle ne prédit pas mieux qu'un pile ou face : le chiffre ci-dessous est indicatif.</p>{% endif %}
 <section class="panel proba">
   <p>Ton équipe a <strong>{{ pct }} %</strong> de chances de gagner.</p>
   <div class="duel" style="--pct: {{ pct }}%" role="img" aria-label="{{ pct }} % contre {{ (100 - pct) | round(1) }} %"></div>

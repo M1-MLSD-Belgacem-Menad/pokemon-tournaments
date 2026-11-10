@@ -551,6 +551,7 @@ def test_face_a_face(stats_api):
             "log_loss": 0.671,
             "brier": 0.239,
             "accuracy": 0.58,
+            "beats_baseline": True,
         },
     }
     resp = client.get(
@@ -561,6 +562,12 @@ def test_face_a_face(stats_api):
         '<strong class="up">-0.40</strong>' in resp.text
     )  # poids négatif chez l'adversaire : bon pour moi
     assert "jamais vu en match" in resp.text and "log-loss 0.671" in resp.text
+    assert "pile ou face : le chiffre" not in resp.text
+    stats_api[0]["http://api/api/predict?format=F1&a=X&b=Y&b=Z"]["model"][
+        "beats_baseline"
+    ] = False
+    resp = client.get("/versus", params={"format": "F1", "a": "X", "b": ["Y", "Z"]})
+    assert "pile ou face : le chiffre" in resp.text
 
 
 def test_face_a_face_sans_modele(stats_api):

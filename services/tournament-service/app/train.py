@@ -18,7 +18,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, brier_score_loss, log_loss
 
 from app.db import connect
-from app.matchup import BASELINE_BRIER, BASELINE_LOG_LOSS
+from app.schemas import BASELINE_BRIER, BASELINE_LOG_LOSS
 
 MIN_MATCHES = (
     200  # en dessous, pas de modèle pour le format : trop peu de matchs pour ~200 poids
@@ -28,6 +28,9 @@ MIN_TOURNAMENTS = (
 )
 TEST_SHARE = 0.2  # part des tournois (les plus récents) gardés pour le test
 CS = (
+    0.0003,
+    0.001,
+    0.003,
     0.01,
     0.03,
     0.1,

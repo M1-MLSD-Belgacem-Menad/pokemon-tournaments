@@ -174,6 +174,8 @@ CREATE TABLE app_user (
 - **Winrate d'une combinaison** : même calcul, groupé par paire de Pokémon de la même équipe (auto-jointure sur `team_pokemon`). Une combinaison = une **paire** de Pokémon (décision du 14/10, option la plus simple).
 - **Winrate par matchup** : à partir de `game_match`, on compare l'équipe du vainqueur et celle du perdant (Pokémon contre Pokémon). Tous les joueurs et tous les matchs du tournoi sont enregistrés, pour que les winrates ne viennent pas que des joueurs qui ont gagné. Seuls les matchs dont les deux joueurs ont publié leur équipe comptent.
 - **[Reco]** Calcul en SQL (requêtes ou vues) à la demande. Une table de cache ne se justifie que si c'est mesurablement lent.
+- **Fiabilité** : chaque winrate est accompagné d'un intervalle de confiance de Wilson à 95 %, d'une version lissée (prior Beta(5, 5)) et d'un drapeau « peu de données » sous 30 matchs.
+- **Modèle de matchup** : une régression logistique par format, un poids par Pokémon, entraînée chaque nuit par le CronJob `entrainement` (même image que le `tournament-service`) et stockée dans `matchup_model` et `matchup_weight` (migration 012). L'API prédit en additionnant les poids, sans scikit-learn. Détails : [07-apprentissage.md](07-apprentissage.md).
 
 ## 4. Flux de données
 
@@ -196,7 +198,11 @@ Navigateur → gateway → `tournament-service` `POST /api/tournaments` avec le 
 
 ### Créateur d'équipes (étape 3)
 
-Le frontend charge `/api/formats/{id}/legal-pokemon`, l'utilisateur choisit jusqu'à 6 Pokémon, le frontend affiche les statistiques de `/api/stats/...` pour les Pokémon et paires choisis, puis `POST /api/teams` pour sauvegarder.
+Le frontend charge `/api/formats/{id}/legal-pokemon`, l'utilisateur choisit jusqu'à 6 Pokémon, le frontend affiche les statistiques de `/api/stats/...` pour les Pokémon et paires choisis et les trois Pokémon à ajouter de `/api/suggestions`, puis `POST /api/teams` pour sauvegarder. La page Face-à-face appelle `/api/predict` avec deux équipes.
+
+### Réentraînement du modèle
+
+Le CronJob `entrainement` (7 h, une heure après le scraper) lance `python -m app.train` : lecture des matchs dont les deux équipes sont connues, évaluation sur les tournois les plus récents, réentraînement sur tout, puis remplacement du modèle de chaque format dans une transaction.
 
 ## 5. Déploiement
 
