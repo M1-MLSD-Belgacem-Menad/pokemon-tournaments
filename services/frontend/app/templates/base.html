@@ -4,8 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Tournois Pokémon VGC{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css">
-  {# Thème choisi avec le bouton, appliqué avant l'affichage pour éviter un flash #}
+  {# Thème choisi avec le bouton, appliqué avant l'affichage pour éviter un flash (avant la feuille de style : rien n'attend) #}
   <script>
     const root = document.documentElement;
     try { if (localStorage.theme) root.dataset.theme = localStorage.theme } catch {}  // stockage bloqué : thème du système
@@ -15,6 +14,8 @@
       try { localStorage.theme = root.dataset.theme } catch {}
     }
   </script>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23fff' stroke='%231c2230' stroke-width='3'/%3E%3Cpath d='M2 16a14 14 0 0 1 28 0z' fill='%23c7362b' stroke='%231c2230' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='%23fff' stroke='%231c2230' stroke-width='3'/%3E%3C/svg%3E">
 </head>
 <body>
   {% set path = request.url.path %}

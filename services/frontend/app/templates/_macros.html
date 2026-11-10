@@ -1,0 +1,2 @@
+{# Pastilles de types d'un Pokémon (rien si les types ne sont pas encore connus) #}
+{% macro types(list) %}{% if list %}<div class="types">{% for ty in list %}<span class="type t-{{ ty }}">{{ ty | type_fr }}</span>{% endfor %}</div>{% endif %}{% endmacro %}
