@@ -31,7 +31,7 @@ spec:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
                 capabilities: { drop: [ALL] }
-              # scikit-learn et la matrice creuse des matchs : quelques dizaines de Mo pour 300 tournois.
+              # SciPy et la matrice creuse des matchs : quelques dizaines de Mo pour 300 tournois.
               resources:
                 requests: { cpu: 100m, memory: 128Mi }
                 limits: { cpu: 1, memory: 512Mi }

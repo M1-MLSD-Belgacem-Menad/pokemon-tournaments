@@ -1,7 +1,8 @@
-"""Prédiction de matchs et suggestions du créateur, à partir du modèle écrit en base par app/train.py.
+"""Prédiction de matchs et suggestions du créateur.
 
-Le modèle est linéaire : prédire = additionner des poids lus en base, sans scikit-learn dans l'API.
-Méthode, formules et limites : docs/07-apprentissage.md.
+Prédiction : modèle linéaire écrit en base par app/train.py, prédire = additionner des poids lus en base,
+sans scikit-learn dans l'API. Suggestions : fréquence d'association des Pokémon dans les équipes du format.
+Méthode, formules, mesures et limites : docs/07-apprentissage.md.
 """
 
 import math
@@ -10,22 +11,12 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query
 
 from app.db import Conn
-from app.schemas import BASELINE_BRIER, BASELINE_LOG_LOSS
-from app.stats import (
-    LOW_DATA,
-    in_names,
-    pokemon_info,
-    pokemon_stats,
-    smoothed,
-)
+from app.schemas import BASELINE_BRIER, BASELINE_LOG_LOSS, teams_help
+from app.stats import in_names, pokemon_info, winrate
 
 router = APIRouter()
 Team = Annotated[list[str], Query(min_length=1, max_length=6)]
-TEAM_SIZE = 6
-# Lissage des winrates de paires : 50 matchs fictifs (environ 7 équipes) au winrate habituel du candidat.
-# Plus fort que celui des winrates simples (10) : les bilans d'équipes portent aussi le niveau des joueurs,
-# et une paire jouée par 9 équipes passait sinon devant une paire jouée par 40 (mesuré sur 94 tournois).
-SYNERGY_PRIOR = 50
+ALPHA = 1  # lissage des suggestions : une équipe fictive, au taux d'usage du candidat
 METRICS = (
     "trained_at",
     "train_matches",
@@ -34,7 +25,17 @@ METRICS = (
     "log_loss",
     "brier",
     "accuracy",
-    "beats_baseline",
+    "elo_log_loss",
+    "delta_low",
+    "delta_high",
+    "teams_help",
+)
+# Pokémon des équipes du format, dans les tournois scrapés (ceux qui ont des listes d'équipes et des bilans).
+FORMAT_TEAMS = (
+    " FROM team_pokemon tp JOIN standing s ON s.id = tp.standing_id"
+    " JOIN tournament t ON t.id = s.tournament_id JOIN format f ON f.id = t.format_id"
+    " JOIN pokemon pk ON pk.id = tp.pokemon_id"
+    " WHERE f.code = %s AND t.source = 'scraped'"
 )
 
 
@@ -51,8 +52,9 @@ def load_model(cur, format_code: str) -> tuple[dict, dict[str, float]]:
     model = cur.fetchone()
     if not model:
         raise HTTPException(404, f"pas encore de modèle pour {format_code}")
-    # Sur les tournois récents, le modèle fait-il mieux que « toujours 50 % » ? Sinon l'interface le dit.
-    model["beats_baseline"] = model["log_loss"] < BASELINE_LOG_LOSS
+    model["teams_help"] = teams_help(
+        model
+    )  # sinon l'interface dit que la prédiction est indicative
     cur.execute(
         "SELECT pk.name, w.weight FROM matchup_weight w JOIN pokemon pk ON pk.id = w.pokemon_id"
         " WHERE w.format_id = %s",
@@ -74,7 +76,8 @@ def model_info(conn: Conn, format: str) -> dict:
 
 @router.get("/api/predict")
 def predict(conn: Conn, format: str, a: Team, b: Team) -> dict:
-    """Probabilité que l'équipe `a` batte l'équipe `b`, et poids de chaque Pokémon (le plus influent d'abord).
+    """Probabilité que l'équipe `a` batte l'équipe `b` à niveau de joueur égal (décalage Elo nul),
+    et poids de chaque Pokémon (le plus influent d'abord).
 
     Un Pokémon absent du modèle (jamais vu dans un match du format) a un poids nul, signalé par `known`.
     """
@@ -103,27 +106,6 @@ def predict(conn: Conn, format: str, a: Team, b: Team) -> dict:
     }
 
 
-def pair_stats(cur, format_code: str, chosen: list[str]) -> list[dict]:
-    """Bilan des équipes du format qui alignent un Pokémon choisi (`partner`) avec un autre (`candidate`).
-
-    Seulement les paires d'au moins 30 matchs : quelques équipes ne prouvent aucune synergie.
-    """
-    where, args = in_names("pp.name", chosen)
-    cur.execute(
-        "SELECT pc.name AS candidate, pp.name AS partner, COUNT(*) AS teams,"
-        " SUM(s.wins) AS wins, SUM(s.losses) AS losses"
-        " FROM team_pokemon tc JOIN team_pokemon tp ON tp.standing_id = tc.standing_id"
-        " JOIN standing s ON s.id = tc.standing_id JOIN tournament t ON t.id = s.tournament_id"
-        " JOIN format f ON f.id = t.format_id"
-        " JOIN pokemon pc ON pc.id = tc.pokemon_id JOIN pokemon pp ON pp.id = tp.pokemon_id"
-        " WHERE f.code = %s AND s.wins IS NOT NULL AND tc.pokemon_id <> tp.pokemon_id"
-        + where
-        + " GROUP BY pc.name, pp.name HAVING SUM(s.wins) + SUM(s.losses) >= %s",
-        (format_code, *args, LOW_DATA),
-    )
-    return cur.fetchall()
-
-
 @router.get("/api/suggestions")
 def suggestions(
     conn: Conn,
@@ -131,78 +113,63 @@ def suggestions(
     pokemon: Annotated[list[str], Query(min_length=1, max_length=5)],
     limit: Annotated[int, Query(ge=1, le=20)] = 3,
 ) -> list[dict]:
-    """Pokémon à ajouter à l'équipe, le meilleur d'abord.
+    """Pokémon à ajouter à l'équipe, le plus probable d'abord.
 
-    Candidats : les Pokémon joués au moins 30 matchs avec un Pokémon choisi (donc légaux dans le format).
-    score = synergie + gain :
-    - synergie : écart moyen, sur les Pokémon choisis, entre le winrate du candidat joué avec chacun
-      et son winrate en général (lissés tous les deux ; sous 30 matchs ensemble, l'écart vaut 0) ;
-    - gain : hausse de la probabilité de battre une équipe moyenne du format selon le modèle (0 sans modèle,
-      ou si le modèle ne fait pas mieux que la prédiction constante 50 % sur les tournois récents).
-      Les places encore vides comptent comme des Pokémon moyens du format, pour comparer des équipes de six.
+    Candidats : tous les Pokémon légaux du format pas encore choisis. Classement « Bayes naïf » de
+    co-occurrence, sur les N équipes du format : score(c) = Σ_{p choisi} log((n(c,p) + α·P(c)) / (n(p) + α)),
+    avec n(c,p) = équipes qui jouent c et p, n(p) = équipes qui jouent p, P(c) = (n(c) + 1) / (N + 1), α = 1.
+    C'est la méthode qui retrouve le mieux le Pokémon que les joueurs ont réellement mis dans leur équipe.
+    `partners` : pour chaque Pokémon choisi, part de ses équipes qui jouent aussi le candidat et winrate
+    de ces équipes, à titre indicatif (il ne sert pas au classement).
     """
     chosen = list(dict.fromkeys(pokemon))
     with conn.cursor() as cur:
-        together = {
-            (r["candidate"], r["partner"]): r
-            for r in pair_stats(cur, format, chosen)
-            if r["candidate"] not in chosen
-        }
-        try:
-            model, weights = load_model(cur, format)
-        except HTTPException:
-            model = None
-    if not (
-        model and model["beats_baseline"]
-    ):  # un modèle pas meilleur que 50 % ne classe rien
-        model, weights = None, {}
-    candidates = sorted({c for c, _ in together})
-    if not candidates:
-        return []
-    alone = {
-        r["pokemon"]: r
-        for r in pokemon_stats(conn, format, candidates, len(candidates))
-    }
-    field = model["field_score"] if model else 0
-    # Score de l'équipe complétée par des Pokémon moyens (field / 6), moins celui d'une équipe moyenne.
-    team_score = (
-        sum(weights.get(p, 0) for p in chosen)
-        + (TEAM_SIZE - len(chosen)) * field / TEAM_SIZE
-        - field
-    )
+        cur.execute(
+            "SELECT COUNT(DISTINCT tp.standing_id) AS n" + FORMAT_TEAMS, (format,)
+        )
+        total = cur.fetchone()["n"]
+        cur.execute(
+            "SELECT pk.name, COUNT(*) AS n" + FORMAT_TEAMS + " GROUP BY pk.name",
+            (format,),
+        )
+        alone = {r["name"]: r["n"] for r in cur.fetchall()}
+        where, args = in_names("pp.name", chosen)
+        cur.execute(
+            "SELECT pc.name AS candidate, pp.name AS partner, COUNT(*) AS teams,"
+            " SUM(s.wins) AS wins, SUM(s.losses) AS losses"
+            " FROM team_pokemon tc JOIN team_pokemon tp ON tp.standing_id = tc.standing_id"
+            " JOIN standing s ON s.id = tc.standing_id JOIN tournament t ON t.id = s.tournament_id"
+            " JOIN format f ON f.id = t.format_id"
+            " JOIN pokemon pc ON pc.id = tc.pokemon_id JOIN pokemon pp ON pp.id = tp.pokemon_id"
+            " WHERE f.code = %s AND t.source = 'scraped' AND tc.pokemon_id <> tp.pokemon_id"
+            + where
+            + " GROUP BY pc.name, pp.name",
+            (format, *args),
+        )
+        together = {(r["candidate"], r["partner"]): r for r in cur.fetchall()}
     out = []
-    for c in candidates:
-        base = smoothed(alone[c]["wins"], alone[c]["wins"] + alone[c]["losses"])
-        partners = []
+    for c in alone.keys() - set(chosen):
+        prior = (alone[c] + 1) / (total + 1)
+        score, partners = 0.0, []
         for p in chosen:
             r = together.get((c, p)) or {"teams": 0, "wins": 0, "losses": 0}
-            wins, losses = int(r["wins"]), int(r["losses"])
-            # Lissé vers le winrate du candidat seul : sans matchs ensemble, aucune synergie.
-            wr = (wins + SYNERGY_PRIOR * base) / (wins + losses + SYNERGY_PRIOR)
+            n_p = alone.get(p, 0)
+            score += math.log((r["teams"] + ALPHA * prior) / (n_p + ALPHA))
             partners.append(
-                {
-                    "partner": p,
-                    "teams": r["teams"],
-                    "wins": wins,
-                    "losses": losses,
-                    "delta": wr - base,
-                }
+                winrate(
+                    {
+                        "partner": p,
+                        "teams": r["teams"],
+                        "share": round(r["teams"] / n_p, 4) if n_p else 0.0,
+                        "wins": r["wins"],
+                        "losses": r["losses"],
+                    }
+                )
             )
-        synergy = sum(x["delta"] for x in partners) / len(partners)
-        gain = (
-            sigmoid(team_score + weights.get(c, 0) - field / TEAM_SIZE)
-            - sigmoid(team_score)
-            if model
-            else 0.0
-        )
-        # Raison affichée : le partenaire déjà joué avec le candidat qui lui réussit le mieux.
-        partners.sort(key=lambda x: (x["teams"] == 0, -x["delta"]))
-        for x in partners:
-            x["delta"] = round(x["delta"], 4)
-        out.append(
-            {"pokemon": c, "score": round(synergy + gain, 4), "synergy": round(synergy, 4),
-             "gain": round(gain, 4) if model else None, "winrate": round(base, 4), "partners": partners}
-        )  # fmt: skip
+        partners.sort(
+            key=lambda x: -x["teams"]
+        )  # le partenaire le plus souvent associé d'abord
+        out.append({"pokemon": c, "score": round(score, 4), "partners": partners})
     out.sort(key=lambda s: (-s["score"], s["pokemon"]))
     top = out[:limit]
     sprites = {

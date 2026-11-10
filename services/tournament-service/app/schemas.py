@@ -125,3 +125,9 @@ class Enrichment(BaseModel):
 
     pokemon: list[PokemonInfo] = []
     moves: list[MoveInfo] = []
+
+
+def teams_help(model: dict) -> bool:
+    """Les équipes améliorent-elles sûrement la prédiction à niveau égal ? Intervalle de l'écart de log-loss
+    entièrement négatif, mesuré sur au moins 2 tournois de test (avec un seul, l'intervalle est de largeur nulle)."""
+    return model["test_tournaments"] >= 2 and model["delta_high"] < 0

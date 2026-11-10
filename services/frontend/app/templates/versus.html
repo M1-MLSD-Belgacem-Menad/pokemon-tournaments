@@ -16,7 +16,7 @@
 {% if not formats %}
 <p class="panel">Aucun tournoi en base : lancer le scraper d'abord.</p>
 {% else %}
-<p class="lead">Choisir deux équipes pour voir laquelle a le plus de chances de gagner, selon un modèle entraîné sur les matchs des tournois scrapés.</p>
+<p class="lead">Choisir deux équipes pour voir laquelle a le plus de chances de gagner entre deux joueurs de même niveau, selon un modèle entraîné sur les matchs des tournois scrapés.</p>
 <form method="get" action="/versus">
   <label>Format
     <select name="format">
@@ -30,9 +30,9 @@
 {% if no_model %}
 <p class="panel">Le modèle de ce format n'est pas encore entraîné (assez de matchs nécessaires, entraînement chaque nuit).</p>
 {% elif prediction %}{% set pct = (prediction.probability * 100) | round(1) %}{% set m = prediction.model %}
-{% if not m.beats_baseline %}<p class="error" role="status">Sur les tournois les plus récents, ce modèle ne prédit pas mieux qu'un pile ou face : le chiffre ci-dessous est indicatif.</p>{% endif %}
+{% if not m.teams_help %}<p class="error" role="status">À niveau de joueur égal, la composition des équipes n'a pas d'effet mesurable sur les tournois les plus récents : le chiffre ci-dessous est indicatif.</p>{% endif %}
 <section class="panel proba">
-  <p>Ton équipe a <strong>{{ pct }} %</strong> de chances de gagner.</p>
+  <p>À niveau de joueur égal, ton équipe a <strong>{{ pct }} %</strong> de chances de gagner.</p>
   <div class="duel" style="--pct: {{ pct }}%" role="img" aria-label="{{ pct }} % contre {{ (100 - pct) | round(1) }} %"></div>
   <h2>Ce qui pèse le plus</h2>
   <ul class="weights">
@@ -42,7 +42,7 @@
   {% endfor %}
   </ul>
 </section>
-<p class="meta">Régression logistique : un poids par Pokémon, la probabilité vient de la différence entre les sommes des poids des deux équipes. Entraîné le {{ m.trained_at[:10] }} ; sur les {{ m.test_matches }} matchs des tournois les plus récents, gardés pour le test : log-loss {{ "%.3f" | format(m.log_loss) }} (0.693 pour un pile ou face), score de Brier {{ "%.3f" | format(m.brier) }} (0.25), bon vainqueur dans {{ (m.accuracy * 100) | round | int }} % des cas. Le niveau des joueurs n'est pas pris en compte : c'est une tendance, pas une certitude.</p>
+<p class="meta">Régression logistique en deux étages : le niveau des deux joueurs (Elo), puis un poids par Pokémon ; la probabilité affichée vient de la différence entre les sommes des poids des deux équipes, à niveau égal. Entraîné le {{ m.trained_at[:10] }} ; sur les {{ m.test_matches }} matchs des tournois les plus récents, gardés pour le test : log-loss {{ "%.3f" | format(m.log_loss) }} avec les équipes, {{ "%.3f" | format(m.elo_log_loss) }} avec le niveau des joueurs seul, 0.693 pour un pile ou face (plus bas = meilleur) ; écart dû aux équipes entre {{ "%+.3f" | format(m.delta_low) }} et {{ "%+.3f" | format(m.delta_high) }} (intervalle à 95 %). Score de Brier {{ "%.3f" | format(m.brier) }} (0.25), bon vainqueur dans {{ (m.accuracy * 100) | round | int }} % des cas. C'est une tendance, pas une certitude.</p>
 {% endif %}
 {% endif %}
 {% endblock %}

@@ -9,7 +9,8 @@ dependencies = [
     "uvicorn",
     "grpcio>=1.84.0",
     "grpcio-tools>=1.84.0",
-    "scikit-learn>=1.7",
+    "numpy>=2.3",
+    "scipy>=1.16",
 ]
 
 [dependency-groups]
