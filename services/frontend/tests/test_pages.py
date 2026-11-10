@@ -213,7 +213,15 @@ def test_menu_marque_la_page_courante(api):
 
 
 def test_tournoi_inconnu_renvoie_404(api):
-    assert client.get("/tournaments/999").status_code == 404
+    resp = client.get("/tournaments/999")
+    assert resp.status_code == 404
+    assert "Page introuvable" in resp.text  # page du site, pas du JSON
+    assert 'href="/"' in resp.text
+
+
+def test_page_inconnue_affiche_la_page_d_erreur():
+    resp = client.get("/nimporte-quoi")
+    assert resp.status_code == 404 and "Page introuvable" in resp.text
 
 
 def test_erreur_de_l_api_renvoie_502(api):
@@ -225,7 +233,8 @@ def test_api_injoignable_renvoie_503(monkeypatch):
         raise urllib.error.URLError("connexion refusée")
 
     monkeypatch.setattr(main.urllib.request, "urlopen", down)
-    assert client.get("/").status_code == 503
+    resp = client.get("/")
+    assert resp.status_code == 503 and "ne répond pas" in resp.text
 
 
 def test_internal_not_served():

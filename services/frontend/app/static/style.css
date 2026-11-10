@@ -255,3 +255,11 @@ form:has(input[value="winner"]:checked) .entry tbody tr:not(:first-child) { opac
   .theme { margin-left: auto; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* Page d'erreur : grand code d'état, message, retour à l'accueil */
+.oops { max-width: 34rem; margin: 3rem auto; text-align: center; }
+.oops-code { margin: 0; font-size: 4.5rem; font-weight: 800; line-height: 1; letter-spacing: -0.04em; color: var(--accent); }
+.actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; }
+a.button { display: inline-block; padding: 0.5rem 1rem; border: 1px solid var(--button); border-radius: var(--radius); background: var(--button); color: var(--accent-ink); font-weight: 600; text-decoration: none; }
+a.button:hover { filter: brightness(1.08); color: var(--accent-ink); }
+a.button.quiet { background: none; border-color: var(--line); color: var(--ink); }
