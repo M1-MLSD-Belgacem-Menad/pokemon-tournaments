@@ -15,6 +15,7 @@ resources:
   - frontend/service.yaml
   - ingress.yaml
   - scraper/cronjob.yaml
+  - tournament/cronjob-entrainement.yaml
 # Même script d'initialisation que Compose (k8s/mysql/initdb/).
 configMapGenerator:
   - name: mysql-initdb
