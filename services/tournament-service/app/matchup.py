@@ -21,6 +21,8 @@ from app.stats import (
 
 router = APIRouter()
 Team = Annotated[list[str], Query(min_length=1, max_length=6)]
+BASELINE_LOG_LOSS, BASELINE_BRIER = math.log(2), 0.25  # prédire toujours 50 %
+TEAM_SIZE = 6
 METRICS = (
     "trained_at",
     "train_matches",
@@ -59,8 +61,8 @@ def model_info(conn: Conn, format: str) -> dict:
     with conn.cursor() as cur:
         model, _ = load_model(cur, format)
     return {k: model[k] for k in METRICS} | {
-        "baseline_log_loss": math.log(2),
-        "baseline_brier": 0.25,
+        "baseline_log_loss": BASELINE_LOG_LOSS,
+        "baseline_brier": BASELINE_BRIER,
     }
 
 
@@ -72,6 +74,10 @@ def predict(conn: Conn, format: str, a: Team, b: Team) -> dict:
     """
     with conn.cursor() as cur:
         model, weights = load_model(cur, format)
+    a, b = (
+        list(dict.fromkeys(a)),
+        list(dict.fromkeys(b)),
+    )  # un doublon ne compte qu'une fois
     score = sum(weights.get(p, 0) for p in a) - sum(weights.get(p, 0) for p in b)
     rows = [
         {
@@ -81,7 +87,7 @@ def predict(conn: Conn, format: str, a: Team, b: Team) -> dict:
             "known": p in weights,
         }
         for side, team in (("a", a), ("b", b))
-        for p in dict.fromkeys(team)
+        for p in team
     ]
     rows.sort(key=lambda r: -abs(r["weight"]))
     return {
@@ -122,6 +128,7 @@ def suggestions(
     - synergie : écart moyen, sur les Pokémon choisis, entre le winrate du candidat joué avec chacun
       et son winrate en général (lissés tous les deux ; sans match ensemble, l'écart vaut 0) ;
     - gain : hausse de la probabilité de battre une équipe moyenne du format selon le modèle (0 sans modèle).
+      Les places encore vides comptent comme des Pokémon moyens du format, pour comparer des équipes de six.
     """
     chosen = list(dict.fromkeys(pokemon))
     with conn.cursor() as cur:
@@ -132,13 +139,20 @@ def suggestions(
             model, weights = None, {}
         pairs = pair_stats(cur, format, chosen)
     alone = (
-        {r["pokemon"]: r for r in pokemon_stats(conn, format, candidates, 500)}
+        {
+            r["pokemon"]: r
+            for r in pokemon_stats(conn, format, candidates, len(candidates))
+        }
         if candidates
         else {}
     )
     together = {(r["candidate"], r["partner"]): r for r in pairs}
-    team_score = sum(weights.get(p, 0) for p in chosen) - (
-        model["field_score"] if model else 0
+    field = model["field_score"] if model else 0
+    # Score de l'équipe complétée par des Pokémon moyens (field / 6), moins celui d'une équipe moyenne.
+    team_score = (
+        sum(weights.get(p, 0) for p in chosen)
+        + (TEAM_SIZE - len(chosen)) * field / TEAM_SIZE
+        - field
     )
     out = []
     for c in candidates:
@@ -152,15 +166,19 @@ def suggestions(
             wr = (wins + PRIOR_GAMES * base) / (wins + losses + PRIOR_GAMES)
             partners.append(
                 {"partner": p, "teams": r["teams"] if r else 0, "wins": wins, "losses": losses,
-                 "delta": round(wr - base, 4)}
+                 "delta": wr - base}
             )  # fmt: skip
         synergy = sum(x["delta"] for x in partners) / len(partners)
         gain = (
-            sigmoid(team_score + weights.get(c, 0)) - sigmoid(team_score)
+            sigmoid(team_score + weights.get(c, 0) - field / TEAM_SIZE)
+            - sigmoid(team_score)
             if model
             else 0.0
         )
-        partners.sort(key=lambda x: -x["delta"])
+        # Raison affichée : le partenaire déjà joué avec le candidat qui lui réussit le mieux.
+        partners.sort(key=lambda x: (x["teams"] == 0, -x["delta"]))
+        for x in partners:
+            x["delta"] = round(x["delta"], 4)
         out.append(
             {"pokemon": c, "score": round(synergy + gain, 4), "synergy": round(synergy, 4),
              "gain": round(gain, 4) if model else None, "winrate": round(base, 4), "partners": partners}

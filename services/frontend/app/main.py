@@ -274,6 +274,12 @@ def pokemon(request: Request, name: str, format: str | None = None):
     return templates.TemplateResponse(request, "pokemon.html", ctx)
 
 
+def clean_team(team: list[str], legal: list[str]) -> list[str]:
+    """Sans doublon ni case vide, et légaux dans ce format (il a pu changer depuis le choix)."""
+    allowed = set(legal)
+    return list(dict.fromkeys(p for p in team if p in allowed))[:TEAM_SIZE]
+
+
 def suggestions(fmt: str, chosen: list[str]) -> list[dict] | None:
     """Pokémon à ajouter à l'équipe (API), avec le lien qui l'ajoute ; None si l'API échoue."""
     try:
@@ -304,10 +310,7 @@ def builder_page(request: Request, fmt: str | None, chosen: list[str], **extra):
     }
     if fmt:
         ctx["legal"] = api_get(f"/api/formats/{quote(fmt, safe='')}/legal-pokemon")
-        # Sans doublon ni case vide, et légaux dans ce format (il a pu changer depuis le choix).
-        legal = set(ctx["legal"])
-        chosen = list(dict.fromkeys(p for p in chosen if p in legal))[:TEAM_SIZE]
-        ctx["chosen"] = chosen
+        ctx["chosen"] = chosen = clean_team(chosen, ctx["legal"])
         q = urlencode({"format": fmt, "pokemon": chosen}, doseq=True)
         if chosen:
             ctx["info"] = {
@@ -384,7 +387,7 @@ def versus(
         ctx["legal"] = legal = api_get(
             f"/api/formats/{quote(fmt, safe='')}/legal-pokemon"
         )
-        a, b = ([p for p in dict.fromkeys(t) if p in legal][:TEAM_SIZE] for t in (a, b))
+        a, b = clean_team(a, legal), clean_team(b, legal)
         ctx |= {"a": a, "b": b}
         if a and b:
             q = urlencode({"format": fmt, "a": a, "b": b}, doseq=True)

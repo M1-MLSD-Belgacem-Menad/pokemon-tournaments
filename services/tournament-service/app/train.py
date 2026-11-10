@@ -9,7 +9,7 @@ donc P(B bat A) = 1 - P(A bat B), quel que soit l'ordre des joueurs.
 constante de 50 %. Le modèle enregistré est ensuite réentraîné sur tous les matchs du format.
 """
 
-import math
+import sys
 from collections import defaultdict
 
 import numpy as np
@@ -18,6 +18,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, brier_score_loss, log_loss
 
 from app.db import connect
+from app.matchup import BASELINE_BRIER, BASELINE_LOG_LOSS
 
 MIN_MATCHES = (
     200  # en dessous, pas de modèle pour le format : trop peu de matchs pour ~200 poids
@@ -33,7 +34,6 @@ CS = (
     0.3,
     1.0,
 )  # forces de régularisation L2 essayées (petit C = poids proches de 0)
-BASELINE_LOG_LOSS, BASELINE_BRIER = math.log(2), 0.25  # prédire toujours 50 %
 
 MATCHES = (
     "SELECT t.format_id, gm.tournament_id, gm.player1_id = gm.winner_id AS y,"
@@ -126,7 +126,9 @@ def train_format(matches: list[tuple]) -> dict:
         for pk in a | b:
             counts[pk] += 1
     # Score moyen d'une équipe du format : l'adversaire « type » des suggestions du créateur.
-    teams = {t for m in matches for t in (m[1], m[2])}
+    teams = [
+        t for m in matches for t in (m[1], m[2])
+    ]  # chaque équipe autant de fois qu'elle a joué
     field = sum(sum(weights[pk] for pk in t) for t in teams) / len(teams)
     return {
         "train_matches": len(train),
@@ -156,7 +158,7 @@ def store(cur, format_id: int, result: dict) -> None:
 
 
 def main() -> None:
-    conn = connect()
+    conn, failed = connect(), False
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT id, code FROM format")
@@ -169,7 +171,15 @@ def main() -> None:
                         f" (minimum {MIN_MATCHES} matchs et {MIN_TOURNAMENTS} tournois)"
                     )
                     continue
-                r = train_format(matches)
+                try:
+                    r = train_format(matches)
+                except ValueError as e:  # ex. une seule classe dans une partie : les autres formats continuent
+                    print(
+                        f"{codes[format_id]} : échec de l'entraînement ({e})",
+                        file=sys.stderr,
+                    )
+                    failed = True
+                    continue
                 store(cur, format_id, r)
                 conn.commit()  # un modèle par transaction : l'API ne voit jamais un modèle à moitié écrit
                 print(
@@ -180,6 +190,10 @@ def main() -> None:
                 )
     finally:
         conn.close()
+    if failed:
+        sys.exit(
+            1
+        )  # Job en échec visible dans kubectl ; l'ancien modèle du format reste en base
 
 
 if __name__ == "__main__":

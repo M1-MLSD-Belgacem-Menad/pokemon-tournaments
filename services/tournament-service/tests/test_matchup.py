@@ -114,3 +114,9 @@ def test_suggestions_without_model_use_synergy_only(client, data):
         r["pokemon"] for r in rows
     ]
     assert {r["pokemon"] for r in rows} == {"B", "C", "D", "Fort", "Faible"}
+
+
+def test_predict_counts_a_duplicate_once(client, model):
+    once = client.get("/api/predict?format=F1&a=Fort&b=A").json()
+    twice = client.get("/api/predict?format=F1&a=Fort&a=Fort&b=A").json()
+    assert once["probability"] == twice["probability"]
