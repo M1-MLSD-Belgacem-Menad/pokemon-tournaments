@@ -3,6 +3,12 @@
 <h1>Tournois</h1>
 <p class="lead">Les derniers tournois VGC importés et saisis, du plus récent au plus ancien.</p>
 {% if tournaments %}
+{% set counts = tournaments | selectattr("player_count") | map(attribute="player_count") | list %}
+<ul class="kpis">
+  <li><strong>{{ tournaments | length }}</strong> tournois</li>
+  <li><strong>{{ counts | sum }}</strong> joueurs inscrits</li>
+  <li><strong>{{ tournaments | map(attribute="format") | unique | list | length }}</strong> formats</li>
+</ul>
 <div class="scroll">
 <table class="tournaments">
   <thead><tr><th>Date</th><th>Tournoi</th><th>Format</th><th class="num">Joueurs</th></tr></thead>

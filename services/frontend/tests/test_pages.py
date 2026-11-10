@@ -118,6 +118,7 @@ def test_liste_avec_lien_vers_le_detail(api):
     assert resp.status_code == 200
     assert "VGC Test Cup" in resp.text
     assert 'href="/tournaments/1"' in resp.text
+    assert "<strong>92</strong> joueurs inscrits" in resp.text  # chiffres clés
 
 
 def test_detail_affiche_le_classement_et_l_equipe(api):

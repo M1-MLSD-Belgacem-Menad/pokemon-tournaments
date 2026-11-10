@@ -210,7 +210,13 @@ fieldset label { flex-direction: row; align-items: center; gap: 0.5rem; font-wei
 /* Liste des tournois */
 .tournaments td:first-child { color: var(--muted); white-space: nowrap; }
 .tournaments a { font-weight: 600; text-decoration: none; }
-.tournaments a:hover { text-decoration: underline; }
+.tournaments tbody tr { position: relative; cursor: pointer; }
+.tournaments a::after { content: ""; position: absolute; inset: 0; } /* toute la ligne est cliquable */
+.tournaments tr:hover a { color: var(--accent); }
+/* Chiffres clés au-dessus de la liste */
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8rem; list-style: none; margin: 0 0 1.2rem; padding: 0; }
+.kpis li { padding: 0.8rem 1rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); color: var(--muted); font-size: 0.85rem; }
+.kpis strong { display: block; color: var(--ink); font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
 /* Étiquettes discrètes (format, matchups) */
 .tag, .matchups span { display: inline-block; padding: 0 0.45em; border: 1px solid var(--line); border-radius: 3px; font-size: 0.8rem; white-space: nowrap; }
 .tag { color: var(--muted); }
@@ -248,6 +254,17 @@ form:has(input[value="winner"]:checked) .entry tbody tr:not(:first-child) { opac
   .roster span, .roster .sprite { width: 40px; height: 40px; } /* 6 sprites sur une ligne */
   .sets { padding-left: 0.8rem; }
   .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Liste des tournois : une carte par tournoi (nom, puis date, format et joueurs) */
+  .tournaments thead { display: none; }
+  .tournaments tbody tr { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 0.25rem 0.6rem; padding: 0.75rem 0.9rem; border-bottom: 1px solid var(--line); }
+  .tournaments tbody tr:last-child { border-bottom: 0; }
+  .tournaments td { padding: 0; border: 0; }
+  .tournaments td:nth-child(2) { grid-column: 1 / -1; grid-row: 1; }
+  .tournaments td.num { text-align: left; }
+  .tournaments td.num:not(:empty)::after { content: " joueurs"; color: var(--muted); }
+  .kpis { gap: 0.5rem; }
+  .kpis li { padding: 0.6rem 0.7rem; font-size: 0.78rem; }
+  .kpis strong { font-size: 1.3rem; }
   .base-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; margin-left: 0; }
   /* Menu sur une ligne qui défile horizontalement plutôt que sur trois lignes */
   .site-header .inner { flex-wrap: wrap; }
