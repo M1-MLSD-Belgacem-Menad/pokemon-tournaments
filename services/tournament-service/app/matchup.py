@@ -14,7 +14,6 @@ from app.schemas import BASELINE_BRIER, BASELINE_LOG_LOSS
 from app.stats import (
     LOW_DATA,
     in_names,
-    legal_pokemon,
     pokemon_info,
     pokemon_stats,
     smoothed,
@@ -105,7 +104,10 @@ def predict(conn: Conn, format: str, a: Team, b: Team) -> dict:
 
 
 def pair_stats(cur, format_code: str, chosen: list[str]) -> list[dict]:
-    """Bilan des équipes du format qui alignent un Pokémon choisi (`partner`) avec un autre (`candidate`)."""
+    """Bilan des équipes du format qui alignent un Pokémon choisi (`partner`) avec un autre (`candidate`).
+
+    Seulement les paires d'au moins 30 matchs : quelques équipes ne prouvent aucune synergie.
+    """
     where, args = in_names("pp.name", chosen)
     cur.execute(
         "SELECT pc.name AS candidate, pp.name AS partner, COUNT(*) AS teams,"
@@ -116,8 +118,8 @@ def pair_stats(cur, format_code: str, chosen: list[str]) -> list[dict]:
         " JOIN pokemon pc ON pc.id = tc.pokemon_id JOIN pokemon pp ON pp.id = tp.pokemon_id"
         " WHERE f.code = %s AND s.wins IS NOT NULL AND tc.pokemon_id <> tp.pokemon_id"
         + where
-        + " GROUP BY pc.name, pp.name",
-        (format_code, *args),
+        + " GROUP BY pc.name, pp.name HAVING SUM(s.wins) + SUM(s.losses) >= %s",
+        (format_code, *args, LOW_DATA),
     )
     return cur.fetchall()
 
@@ -129,37 +131,38 @@ def suggestions(
     pokemon: Annotated[list[str], Query(min_length=1, max_length=5)],
     limit: Annotated[int, Query(ge=1, le=20)] = 3,
 ) -> list[dict]:
-    """Pokémon légaux à ajouter à l'équipe, le meilleur d'abord.
+    """Pokémon à ajouter à l'équipe, le meilleur d'abord.
 
+    Candidats : les Pokémon joués au moins 30 matchs avec un Pokémon choisi (donc légaux dans le format).
     score = synergie + gain :
     - synergie : écart moyen, sur les Pokémon choisis, entre le winrate du candidat joué avec chacun
-      et son winrate en général (lissés tous les deux ; sous 30 matchs ensemble, l'écart vaut 0).
-      Un candidat qui n'a 30 matchs avec aucun Pokémon choisi n'est pas proposé ;
+      et son winrate en général (lissés tous les deux ; sous 30 matchs ensemble, l'écart vaut 0) ;
     - gain : hausse de la probabilité de battre une équipe moyenne du format selon le modèle (0 sans modèle,
       ou si le modèle ne fait pas mieux que la prédiction constante 50 % sur les tournois récents).
       Les places encore vides comptent comme des Pokémon moyens du format, pour comparer des équipes de six.
     """
     chosen = list(dict.fromkeys(pokemon))
     with conn.cursor() as cur:
-        candidates = [p for p in legal_pokemon(cur, format) if p not in chosen]
+        together = {
+            (r["candidate"], r["partner"]): r
+            for r in pair_stats(cur, format, chosen)
+            if r["candidate"] not in chosen
+        }
         try:
             model, weights = load_model(cur, format)
         except HTTPException:
-            model, weights = None, {}
-        if (
-            model and not model["beats_baseline"]
-        ):  # un modèle pas meilleur que 50 % ne classe rien
-            model, weights = None, {}
-        pairs = pair_stats(cur, format, chosen)
-    alone = (
-        {
-            r["pokemon"]: r
-            for r in pokemon_stats(conn, format, candidates, len(candidates))
-        }
-        if candidates
-        else {}
-    )
-    together = {(r["candidate"], r["partner"]): r for r in pairs}
+            model = None
+    if not (
+        model and model["beats_baseline"]
+    ):  # un modèle pas meilleur que 50 % ne classe rien
+        model, weights = None, {}
+    candidates = sorted({c for c, _ in together})
+    if not candidates:
+        return []
+    alone = {
+        r["pokemon"]: r
+        for r in pokemon_stats(conn, format, candidates, len(candidates))
+    }
     field = model["field_score"] if model else 0
     # Score de l'équipe complétée par des Pokémon moyens (field / 6), moins celui d'une équipe moyenne.
     team_score = (
@@ -169,24 +172,22 @@ def suggestions(
     )
     out = []
     for c in candidates:
-        a = alone.get(c, {"wins": 0, "losses": 0})  # légal mais sans bilan : 50 %
-        base = smoothed(a["wins"], a["wins"] + a["losses"])
+        base = smoothed(alone[c]["wins"], alone[c]["wins"] + alone[c]["losses"])
         partners = []
         for p in chosen:
-            r = together.get((c, p))
-            wins, losses = (int(r["wins"] or 0), int(r["losses"] or 0)) if r else (0, 0)
-            if (
-                wins + losses < LOW_DATA
-            ):  # quelques équipes ne prouvent rien : pas de synergie mesurée
-                r, wins, losses = None, 0, 0
+            r = together.get((c, p)) or {"teams": 0, "wins": 0, "losses": 0}
+            wins, losses = int(r["wins"]), int(r["losses"])
             # Lissé vers le winrate du candidat seul : sans matchs ensemble, aucune synergie.
             wr = (wins + SYNERGY_PRIOR * base) / (wins + losses + SYNERGY_PRIOR)
             partners.append(
-                {"partner": p, "teams": r["teams"] if r else 0, "wins": wins, "losses": losses,
-                 "delta": wr - base}
-            )  # fmt: skip
-        if not any(x["wins"] + x["losses"] for x in partners):
-            continue  # jamais assez joué avec l'équipe : ce n'est pas une suggestion de synergie
+                {
+                    "partner": p,
+                    "teams": r["teams"],
+                    "wins": wins,
+                    "losses": losses,
+                    "delta": wr - base,
+                }
+            )
         synergy = sum(x["delta"] for x in partners) / len(partners)
         gain = (
             sigmoid(team_score + weights.get(c, 0) - field / TEAM_SIZE)
@@ -204,14 +205,9 @@ def suggestions(
         )  # fmt: skip
     out.sort(key=lambda s: (-s["score"], s["pokemon"]))
     top = out[:limit]
-    sprites = (
-        {
-            i["name"]: i["sprite"]
-            for i in pokemon_info(conn, [s["pokemon"] for s in top])
-        }
-        if top
-        else {}
-    )
+    sprites = {
+        i["name"]: i["sprite"] for i in pokemon_info(conn, [s["pokemon"] for s in top])
+    }
     for s in top:
         s["sprite"] = sprites.get(s["pokemon"])
     return top
