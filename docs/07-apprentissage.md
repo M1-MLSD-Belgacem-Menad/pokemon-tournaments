@@ -176,7 +176,7 @@ Page web : **Face-à-face** (`/versus`), deux équipes de six cases. Elle affich
 
 ## 5. Suggestions dans le créateur
 
-Quand l'équipe a entre 1 et 5 Pokémon, le créateur affiche les trois Pokémon légaux qui la complètent le mieux. Chacun a un bouton « Ajouter ».
+Quand l'équipe a entre 1 et 5 Pokémon, le créateur affiche, juste sous le formulaire, les trois Pokémon légaux qui la complètent le mieux. Chacun a un bouton « Ajouter ». La page se met à jour à chaque choix, sans rechargement. Deux méthodes sont utilisées selon la taille de l'équipe : la co-occurrence avec un seul Pokémon, les équipes les plus proches (k plus proches voisins) à partir de deux.
 
 ### Méthode : co-occurrence (Bayes naïf)
 
@@ -214,7 +214,96 @@ Les 501 équipes complètes des 18 tournois de test servent de vérité. On cach
 
 Captures (données des 94 tournois, base locale) : [créateur](rapport/ml-createur-suggestions.png), [face-à-face](rapport/ml-face-a-face.png), [fiche Pokémon avec intervalle](rapport/ml-fiche-fiabilite.png).
 
-## 6. Limites
+### Équipes les plus proches (k plus proches voisins), à partir de deux Pokémon
+
+La co-occurrence regarde les Pokémon choisis un par un : elle additionne des paires. Les joueurs, eux, construisent des équipes entières, et beaucoup reprennent une équipe déjà jouée. La seconde méthode compare donc l'équipe en cours S à chaque équipe T du format :
+
+**similarité(S, T) = (|S ∩ T| / |S ∪ T|)²** (indice de Jaccard au carré).
+
+Les K = 25 équipes les plus similaires votent pour leurs autres Pokémon, chacune avec sa similarité, et la co-occurrence départage les égalités et les Pokémon qui n'ont aucun vote. Le carré donne beaucoup plus de poids à une équipe qui partage 4 Pokémon qu'à une équipe qui en partage 2. À similarité égale, l'équipe qui a le plus de victoires passe d'abord, puis la plus récente.
+
+Code : `format_teams`, `neighbours` et `suggestions` dans `app/matchup.py`. Une requête lit les équipes du format en une seule requête SQL, puis compare en Python (environ 2 ms pour 3 000 équipes) : rien à entraîner ni à stocker.
+
+La route `GET /api/similar-teams?format=&pokemon=…` renvoie les trois équipes les plus proches (joueur, tournoi, place, bilan, Pokémon). Le créateur les affiche sous les suggestions, Pokémon en commun surlignés, dès deux Pokémon et même avec une équipe complète : c'est la justification concrète des suggestions (« Joué par 20 des 25 équipes les plus proches de la tienne »), qu'on peut vérifier en ouvrant le tournoi.
+
+**Choix des réglages.** Mesurés sur la validation (les 14 tournois les plus récents de l'entraînement, hit@3 moyen sur les tailles 1 à 5) : Jaccard ou simple intersection, K ∈ {10, 25, 50, 100, toutes}, puissance 1 ou 2, pondération par le winrate de l'équipe ou non. Les 8 meilleures combinaisons sont entre 44,4 et 45,3 %, contre 37,0 % pour la co-occurrence : le choix n'est pas sensible. Pondérer par le winrate n'aide pas.
+
+**Résultats sur le test** (mêmes 18 tournois que plus haut ; tailles 1 à 4 : 3 sous-équipes tirées au hasard par équipe, graine fixe, 1 518 cas ; taille 5 : chaque Pokémon caché à tour de rôle). hit@3 en %, écart avec intervalle bootstrap par tournoi :
+
+| Pokémon déjà choisis | co-occurrence | voisins (K = 25) | écart [IC 95 %] |
+|---|---|---|---|
+| 1 | 29,2 | 28,6 | −0,7 [−2,1 ; +1,0] |
+| 2 | 36,2 | 39,6 | +3,4 [+0,6 ; +6,1] |
+| 3 | 44,5 | 57,0 | +12,6 [+9,7 ; +15,2] |
+| 4 | 48,4 | 63,5 | +15,1 [+10,5 ; +18,6] |
+| 5 | 53,2 | 69,5 | +16,3 [+12,6 ; +19,1] |
+
+Avec 5 Pokémon, les voisins trouvent le Pokémon manquant en premier choix dans 54,9 % des cas (36,1 % pour la co-occurrence), rang médian 1. Avec un seul Pokémon, toutes les équipes qui le jouent sont à égalité de similarité : les 25 retenues sont arbitraires, d'où la co-occurrence dans ce cas.
+
+**D'où vient le gain.** 291 des 506 équipes de test (58 %) avaient déjà été jouées telles quelles à l'entraînement (102 par le même joueur, 189 par d'autres). Les voisins retrouvent ces copies. Sur les 215 équipes jamais vues, les deux méthodes sont à égalité de 2 à 4 Pokémon (écarts de +0,3 à +1,6 point, non significatifs) ; seul l'écart à 5 Pokémon reste positif (+3,0 [+0,1 ; +5,6]). C'est cohérent avec l'usage : en VGC, la plupart des joueurs partent d'une équipe qui a déjà fait ses preuves, et le créateur la leur montre.
+
+Script d'évaluation : `evaluer_knn.py` (hors dépôt, comme les autres scripts d'étude), reproduit d'abord les chiffres de la co-occurrence ci-dessus (36,1 / 53,2 / 77,7 % contre 36,0 / 53,3 / 77,8 %, à 5 équipes près selon l'ordre de quatre tournois du même jour).
+
+## 6. Archétypes : les familles d'équipes du format
+
+Le créateur dit aussi à quelle famille d'équipes ressemble l'équipe en cours : « Eternal Flower Floette / Incineroar / Sneasler : 315 équipes, 9 % du format, winrate 50,5 %, top 8 16 % ».
+
+Code : `find_archetypes`, `kmeans` et `train_archetypes` dans `app/train.py` (entraînement), `app/archetypes.py` (API), migration `014_archetypes.sql`.
+
+### Méthode : k-means sphérique
+
+- **Vecteur d'une équipe** : une case par Pokémon du format, 1 s'il est dans l'équipe, multipliée par l'IDF = ln(N / équipes qui jouent ce Pokémon), puis normalisée. Un Pokémon joué partout (Rillaboom, 35 % des équipes) pèse environ trois fois moins qu'un Pokémon qui signe un style de jeu.
+- **k-means sphérique**, k = 12 : chaque équipe va au centre de plus grand cosinus, un centre est la moyenne normalisée de ses équipes. Initialisation k-means++, 10 essais, graine fixe : les mêmes données donnent les mêmes archétypes. Environ 30 lignes de NumPy.
+- **Nom** : jusqu'à 3 Pokémon présents dans au moins la moitié des équipes du groupe, du plus caractéristique au moins caractéristique (lift = part dans le groupe / part dans le format). Un groupe sans aucun Pokémon à 50 % est marqué « divers » : c'est le fourre-tout des équipes hors méta, pas un archétype.
+- **Reconnaître l'équipe en cours** : poids d'un Pokémon pour un archétype = IDF × coordonnée du centre. Le score d'une équipe est la somme des poids de ses Pokémon, calculée en SQL (`SUM … GROUP BY`) : l'API n'a pas besoin de NumPy. Si le meilleur score est le groupe « divers », le créateur n'affiche pas d'archétype.
+- **Top 8** : place ≤ 8, compté seulement dans les tournois d'au moins 32 joueurs.
+
+Le CronJob `entrainement` calcule les archétypes chaque nuit après le modèle de matchs, pour chaque format d'au moins 500 équipes, et remplace ceux du format dans une transaction. Sur les 92 tournois : 0,3 seconde.
+
+Routes : `GET /api/archetypes?format=` (liste, avec winrate, top 8 et intervalles de Wilson, Pokémon les plus joués) et `GET /api/archetypes/match?format=&pokemon=…` (archétype le plus proche, le suivant, et `indicative` sous trois Pokémon).
+
+### Choix de la méthode et de k
+
+Étude hors dépôt (`etudier_archetypes.py`) sur les 3 523 équipes M-C.
+
+- **Classification hiérarchique** (distance de Jaccard, lien moyen) : écartée. Elle enchaîne les équipes de proche en proche et produit un groupe géant de 83 à 99 % des équipes.
+- **k-means** : groupes équilibrés, mais silhouette faible (0,13 à 0,23), qui monte avec k sans coude net. Les équipes se chevauchent beaucoup : les archétypes sont des zones d'un continuum, pas des paquets bien séparés.
+- **k = 12** : chaque archétype garde au moins 5 % des équipes (intervalles assez étroits), les noms restent lisibles, et ni k = 8 ni k = 16 ou 20 ne sont plus stables.
+
+### Évaluation
+
+**Stabilité** (k = 12). Accord entre 5 relances sur toutes les données : indice de Rand ajusté 0,62. Entre la première et la seconde moitié chronologique des tournois : 0,43 à 0,48, et 58 à 67 % des archétypes de la première moitié se retrouvent dans la seconde (cosinus des centres ≥ 0,8). Environ 7 archétypes sur 12 sont solides (pluie Pelipper / Archaludon, sable Excadrill / Tyranitar, Distorsion Gardevoir / Indeedee, Whimsicott, Gengar / Incineroar) ; les autres bougent avec la méta et les zones floues. Les numéros d'archétypes changent donc d'une nuit à l'autre : l'interface n'affiche que les noms.
+
+**Équipe partielle** (ce que fait le créateur). Centres appris sur les 80 % de tournois les plus anciens, 654 équipes des tournois récents, n Pokémon tirés au hasard : part des cas où l'archétype trouvé est celui de l'équipe complète.
+
+| Pokémon donnés | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| même archétype que l'équipe complète | 43 % | 62 % | 73 % | 81 % | 89 % |
+
+Répondre toujours l'archétype le plus gros donnerait environ 16 %. Sous trois Pokémon, le créateur précise que l'archétype n'est qu'une indication.
+
+**Archétypes du 17 novembre 2026** (entraînement sur les 92 tournois M-C ; winrate moyen des équipes publiées : 48,7 %, car elles jouent aussi contre des joueurs sans liste publiée et certaines abandonnent) :
+
+| Archétype | équipes | winrate [IC 95 %] | top 8 |
+|---|---|---|---|
+| Whimsicott / Basculegion / Kingambit | 451 | 53,1 % [51 ; 55] | 17,7 % |
+| Gholdengo / Raichu / Rillaboom | 443 | 47,5 % [45 ; 50] | 9,0 % |
+| Pelipper / Archaludon | 396 | 48,5 % [46 ; 51] | 10,9 % |
+| Eternal Flower Floette / Incineroar / Sneasler | 315 | 50,5 % [48 ; 53] | 16,1 % |
+| Sylveon / Farigiraf / Charizard | 295 | 48,6 % [46 ; 51] | 10,8 % |
+| divers (Sinistcha, Tyranitar) | 285 | 43,9 % [41 ; 47] | 3,9 % |
+| Excadrill / Tyranitar | 271 | 47,6 % [45 ; 50] | 8,9 % |
+| Gardevoir / Indeedee ♀ | 268 | 45,9 % [43 ; 49] | 13,4 % |
+| Swampert / Archaludon / Pelipper | 206 | 48,8 % [46 ; 52] | 13,2 % |
+| Gengar / Incineroar / Rillaboom | 199 | 49,8 % [47 ; 53] | 14,5 % |
+| Farigiraf | 198 | 46,0 % [43 ; 49] | 11,6 % |
+| Dragonite / Sneasler / Rillaboom | 196 | 52,9 % [50 ; 56] | 13,0 % |
+
+Le groupe « divers » a le plus mauvais bilan (3,9 % de top 8) : les équipes hors méta réussissent moins. Les intervalles de Wilson sont un peu optimistes, car les matchs d'un même tournoi ne sont pas indépendants (un bootstrap par tournoi donne des intervalles proches pour les vrais archétypes, bien plus larges pour « divers »).
+
+**Limite principale** : comme le winrate d'un Pokémon, celui d'un archétype mélange l'équipe et le niveau des joueurs qui la choisissent. Ce n'est pas un effet causal ; la section 4 montre qu'à niveau égal la composition n'a pas d'effet mesurable.
+
+## 7. Limites
 
 - **Les suggestions suivent la méta.** La co-occurrence propose ce que les joueurs associent, pas ce qui gagne plus. C'est un choix assumé : à niveau égal, aucune mesure de composition testée ne fait gagner davantage sur ces données (section 4). Les équipes à bilan positif ne sont pas mieux retrouvées que les autres (hit@3 55,1 % contre 52,6 %, écart non significatif).
 - **Niveau des joueurs approximatif.** La moitié des joueurs n'ont joué qu'un tournoi : leur Elo reste proche de 1500. Plus d'historique (tournois plus anciens, mêmes joueurs) améliorerait le contrôle du niveau.
@@ -223,6 +312,6 @@ Captures (données des 94 tournois, base locale) : [créateur](rapport/ml-create
 - **Données d'un seul site**, de tournois en ligne de tailles variées, sur un mois. Les résultats ne valent pas pour les tournois officiels en présentiel.
 - **Pas de types.** La table `pokemon_type` est vide : la couverture de types n'a pas pu être testée comme variable.
 
-## 7. Ce qui n'a pas été fait, volontairement
+## 8. Ce qui n'a pas été fait, volontairement
 
-Pas de clustering d'archétypes, pas de suivi d'expériences (MLflow), pas de modèle non linéaire (forêts, réseaux). Ils demanderaient plus de données ou d'outillage, pour un gain incertain : le sujet demande des statistiques de winrate et des conseils, et des comptages et une régression logistique bien évaluée y répondent de façon explicable. Le seul modèle non linéaire essayé (LightGBM, section 4) ne fait pas mieux.
+Pas de suivi d'expériences (MLflow), pas de modèle non linéaire (forêts, réseaux). Ils demanderaient plus de données ou d'outillage, pour un gain incertain : le sujet demande des statistiques de winrate et des conseils, et des comptages et une régression logistique bien évaluée y répondent de façon explicable. Le seul modèle non linéaire essayé (LightGBM, section 4) ne fait pas mieux.
