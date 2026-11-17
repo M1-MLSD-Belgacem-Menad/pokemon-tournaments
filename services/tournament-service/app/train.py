@@ -14,6 +14,10 @@ comparé au niveau seul (sigmoïde du décalage) et à la prédiction constante 
 complet - niveau seul, avec son intervalle à 95 % (bootstrap par tournoi), mesure l'effet propre des
 équipes : s'il est sûrement négatif, les équipes aident à prédire. Le modèle enregistré est ensuite
 réentraîné sur tous les matchs du format.
+
+Archétypes (familles d'équipes), entraînés ensuite par format : chaque équipe est un vecteur de ses
+Pokémon pondérés par l'IDF (un Pokémon joué partout pèse peu), normalisé ; k-means sphérique (cosinus)
+à k = 12 groupes. Nom d'un groupe = ses Pokémon les plus caractéristiques ; groupe sans cœur commun = « divers ».
 """
 
 import math
@@ -39,6 +43,12 @@ TEST_SHARE = 0.2  # part des tournois (les plus récents) gardés pour le test
 CS = (0.001, 0.003, 0.01, 0.03, 0.1)
 ELO_START, ELO_K = 1500, 32  # valeurs classiques des échecs : tout joueur part à 1500
 BOOTSTRAP_DRAWS = 1000
+ARCHETYPE_K = 12  # nombre d'archétypes par format (choisi dans l'étude, docs/07)
+ARCHETYPE_TRIES = 10  # relances du k-means, on garde la meilleure
+ARCHETYPE_MIN_TEAMS = 500  # en dessous, pas d'archétypes pour le format
+CORE_SHARE = 0.5  # Pokémon du cœur d'un archétype : présent dans au moins la moitié de ses équipes
+TOP_CUT = 8  # top cut = place <= 8...
+TOP_MIN_PLAYERS = 32  # ... compté seulement dans les tournois d'au moins 32 joueurs
 
 # Tous les matchs scrapés avec un vainqueur, dans l'ordre où ils ont été joués (pour l'Elo).
 MATCHES = (
@@ -234,6 +244,163 @@ def store(cur, format_id: int, result: dict) -> None:
     )
 
 
+# Une ligne par Pokémon des équipes des tournois scrapés, avec le bilan et la place de l'équipe.
+ARCHETYPE_TEAMS = (
+    "SELECT s.id, t.format_id, s.wins, s.losses, s.placement, t.player_count, pk.id AS pokemon_id, pk.name"
+    " FROM team_pokemon tp JOIN standing s ON s.id = tp.standing_id"
+    " JOIN tournament t ON t.id = s.tournament_id JOIN pokemon pk ON pk.id = tp.pokemon_id"
+    " WHERE t.source = 'scraped'"
+)
+
+
+def load_teams(cur) -> tuple[dict[int, list[tuple]], dict[str, int]]:
+    """Équipes par format : (noms des Pokémon, victoires, défaites, top cut), et id de chaque Pokémon.
+
+    top cut vaut None si le tournoi a moins de 32 joueurs (ou un nombre inconnu) : l'équipe n'y compte pas.
+    """
+    cur.execute(ARCHETYPE_TEAMS)
+    teams, ids = {}, {}
+    for r in cur.fetchall():
+        if r["id"] not in teams:
+            top = None
+            if (r["player_count"] or 0) >= TOP_MIN_PLAYERS:
+                top = r["placement"] is not None and r["placement"] <= TOP_CUT
+            teams[r["id"]] = (
+                r["format_id"],
+                set(),
+                r["wins"] or 0,
+                r["losses"] or 0,
+                top,
+            )
+        teams[r["id"]][1].add(r["name"])
+        ids[r["name"]] = r["pokemon_id"]
+    by_format = defaultdict(list)
+    for format_id, *team in teams.values():
+        by_format[format_id].append(tuple(team))
+    return by_format, ids
+
+
+def kmeans(w, k: int, tries: int = ARCHETYPE_TRIES):
+    """k-means sphérique sur des lignes normalisées : chaque ligne va au centre de plus grand cosinus,
+    un centre = moyenne normalisée de ses lignes. Initialisation k-means++, graine fixe ; on garde
+    l'essai dont la somme des cosinus au centre est la plus grande. Renvoie (groupe de chaque ligne, centres).
+    """
+    # Graine fixe : mêmes archétypes à chaque entraînement sur les mêmes données.
+    rng = np.random.default_rng(0)
+    best = (-1.0, None, None)
+    for _ in range(tries):
+        c = w[[rng.integers(len(w))]]
+        # k-means++ : chaque nouveau centre est tiré loin des centres déjà choisis.
+        while len(c) < k:
+            d = np.clip(1 - (w @ c.T).max(axis=1), 0, None) ** 2
+            c = np.vstack(
+                [c, w[rng.choice(len(w), p=d / d.sum() if d.sum() else None)]]
+            )
+        for _ in range(100):
+            lab = (w @ c.T).argmax(axis=1)
+            new = np.array(
+                [
+                    w[lab == j].mean(axis=0) if (lab == j).any() else c[j]
+                    for j in range(k)
+                ]
+            )
+            new /= np.maximum(np.linalg.norm(new, axis=1, keepdims=True), 1e-12)
+            if np.allclose(new, c):
+                break
+            c = new
+        lab = (w @ c.T).argmax(axis=1)
+        score = (w * c[lab]).sum()
+        if score > best[0]:
+            best = (score, lab, c)
+    return best[1], best[2]
+
+
+def find_archetypes(teams: list[tuple], k: int) -> list[dict]:
+    """Archétypes d'un format à partir de ses équipes (noms des Pokémon, victoires, défaites, top cut).
+
+    Nom = jusqu'à 3 Pokémon présents dans au moins la moitié du groupe, du plus caractéristique au moins
+    caractéristique (lift = part dans le groupe / part dans le format). Aucun : groupe « divers », nommé par
+    ses 2 Pokémon les plus joués. Poids d'un Pokémon = IDF × centre : le score d'une équipe pour un
+    archétype est la somme des poids de ses Pokémon.
+    """
+    names = sorted({p for t in teams for p in t[0]})
+    col = {p: j for j, p in enumerate(names)}
+    b = np.zeros((len(teams), len(names)))  # 1 si le Pokémon est dans l'équipe
+    for i, t in enumerate(teams):
+        b[i, [col[p] for p in t[0]]] = 1
+    idf = np.log(len(teams) / b.sum(axis=0))
+    w = b * idf
+    w /= np.maximum(np.linalg.norm(w, axis=1, keepdims=True), 1e-12)
+    lab, centres = kmeans(w, min(k, len(teams)))
+    usage = b.mean(axis=0)
+    found = []
+    for j in np.unique(lab):  # un centre sans équipe ne donne pas d'archétype
+        group = [t for t, g in zip(teams, lab, strict=True) if g == j]
+        share = b[lab == j].mean(axis=0)
+        core = [
+            i
+            for i in np.argsort(-share / usage, kind="stable")
+            if share[i] >= CORE_SHARE
+        ][:3]
+        shown = core or np.argsort(-share, kind="stable")[:2]
+        tops = [t[3] for t in group if t[3] is not None]
+        found.append(
+            {
+                "name": " / ".join(names[i] for i in shown),
+                "divers": not core,
+                "teams": len(group),
+                "wins": sum(t[1] for t in group),
+                "losses": sum(t[2] for t in group),
+                "top_teams": len(tops),
+                "top_cut": sum(tops),
+                "weights": {
+                    names[i]: (float(idf[i] * centres[j, i]), float(share[i]))
+                    for i in np.flatnonzero(share)
+                },
+            }
+        )
+    return found
+
+
+def store_archetypes(
+    cur, format_id: int, found: list[dict], ids: dict[str, int]
+) -> None:
+    """Remplace les archétypes du format (le DELETE en cascade efface aussi les anciens poids)."""
+    cur.execute("DELETE FROM archetype WHERE format_id = %s", (format_id,))
+    for a in found:
+        cur.execute(
+            "INSERT INTO archetype (format_id, name, divers, teams, wins, losses, top_teams, top_cut)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            (format_id, a["name"], a["divers"], a["teams"], a["wins"], a["losses"], a["top_teams"],
+             a["top_cut"]),
+        )  # fmt: skip
+        archetype_id = cur.lastrowid
+        cur.executemany(
+            "INSERT INTO archetype_weight (archetype_id, pokemon_id, weight, share) VALUES (%s, %s, %s, %s)",
+            [(archetype_id, ids[p], w, s) for p, (w, s) in a["weights"].items()],
+        )
+
+
+def train_archetypes(conn, codes: dict[int, str]) -> None:
+    """Archétypes de chaque format qui a assez d'équipes, un format par transaction."""
+    with conn.cursor() as cur:
+        by_format, ids = load_teams(cur)
+        for format_id, teams in by_format.items():
+            if len(teams) < ARCHETYPE_MIN_TEAMS:
+                print(
+                    f"{codes[format_id]} : {len(teams)} équipes, pas d'archétypes (minimum {ARCHETYPE_MIN_TEAMS})"
+                )
+                continue
+            found = find_archetypes(teams, ARCHETYPE_K)
+            store_archetypes(cur, format_id, found, ids)
+            conn.commit()
+            print(
+                f"{codes[format_id]} : {len(found)} archétypes sur {len(teams)} équipes"
+                f" ({sum(a['divers'] for a in found)} « divers »)",
+                flush=True,
+            )
+
+
 def main() -> None:
     conn, failed = connect(), False
     try:
@@ -271,6 +438,7 @@ def main() -> None:
                     f" : {verdict} | précision {r['accuracy']:.1%}",
                     flush=True,
                 )
+        train_archetypes(conn, codes)
     finally:
         conn.close()
     if failed:
