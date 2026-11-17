@@ -297,6 +297,7 @@ form:has(input[value="winner"]:checked) .entry tbody tr:not(:first-child) { opac
 .suggestions li { display: flex; flex-direction: column; gap: 0.4rem; }
 .suggestions p { margin: 0; font-size: 0.9rem; }
 .suggestions .button { margin-top: auto; align-self: start; }
+.hint { margin: 0 0 1rem; padding: 0.6rem 0.9rem; border-left: 4px solid var(--accent); background: var(--surface); border-radius: var(--radius); }
 .versus { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; margin: 1rem 0; }
 .versus fieldset { display: grid; gap: 0.5rem; margin: 0; }
 .proba > p { font-size: 1.3rem; margin: 0 0 0.6rem; }

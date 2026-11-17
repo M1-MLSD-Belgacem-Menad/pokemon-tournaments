@@ -726,3 +726,22 @@ def test_fiche_pokemon_donnees_incompletes(monkeypatch):
     html = client.get("/pokemon/Ditto?format=M-B").text
     assert "winrate inconnu" in html and "aucune donnée" in html
     assert "base-stats" not in html and "mon-sprite" not in html
+
+
+def test_builder_conseils_visibles_a_chaque_etape(stats_api, monkeypatch):
+    vide = client.get("/builder").text
+    assert "Choisir un premier Pokémon" in vide
+    en_cours = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]}).text
+    assert en_cours.index("Pokémon à ajouter") < en_cours.index(
+        "Mon équipe"
+    )  # sous le formulaire
+    assert 'class="button add"' in en_cours  # ajout sans recharger la page
+    monkeypatch.setattr(main, "TEAM_SIZE", 2)  # X et Y remplissent l'équipe
+    complete = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]}).text
+    assert "Équipe complète" in complete and "Pokémon à ajouter" not in complete
+
+
+def test_feuille_de_style_versionnee():
+    html = client.get("/login").text
+    assert f'href="{main.STYLE_URL}"' in html and "?v=" in main.STYLE_URL
+    assert client.get(main.STYLE_URL).status_code == 200
