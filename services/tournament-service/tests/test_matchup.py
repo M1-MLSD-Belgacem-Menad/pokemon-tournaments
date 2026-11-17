@@ -115,7 +115,17 @@ def test_suggestions_list_every_legal_pokemon(client, data):
     assert sorted(r["pokemon"] for r in rows) == ["B", "C", "D", "Faible", "Fort"]
     assert rows[-1]["pokemon"] == "C" and rows[-1]["partners"][0]["teams"] == 0
     assert rows[-1]["partners"][0]["winrate"] is None
-    assert set(rows[0]) == {"pokemon", "sprite", "score", "partners"}
+    assert set(rows[0]) == {
+        "pokemon",
+        "sprite",
+        "score",
+        "partners",
+        "close_teams",
+        "close_of",
+    }
+    assert (
+        rows[0]["close_teams"] is None
+    )  # un seul Pokémon : co-occurrence, pas de voisins
 
 
 def test_suggestions_rank_by_co_occurrence(client, db):
@@ -212,3 +222,57 @@ def test_teams_help_needs_two_test_tournaments(client, model, db):
         cur.execute("UPDATE matchup_model SET test_tournaments = 1")
     db.commit()
     assert client.get("/api/model?format=F1").json()["teams_help"] is False
+
+
+def import_teams(client, fmt, teams):
+    """Un tournoi scrapé du format `fmt`, une équipe par joueur, bilan 3-2."""
+    players = [f"{fmt}-p{i}" for i in range(len(teams))]
+    tournament = {
+        "source_url": f"https://x/{fmt}",
+        "name": fmt,
+        "date": "2026-10-01",
+        "format": fmt,
+        "players": [{"source_id": p, "name": p} for p in players],
+        "standings": [
+            {
+                "player": p,
+                "placement": i + 1,
+                "wins": 3,
+                "losses": 2,
+                "team": [{"name": x} for x in t],
+            }
+            for i, (p, t) in enumerate(zip(players, teams, strict=True))
+        ],
+    }
+    assert client.post("/internal/import", json=tournament).status_code == 201
+
+
+def test_suggestions_use_close_teams_from_two_pokemon(client, db):
+    # B est souvent joué avec X ou avec Y (co-occurrence), mais les équipes qui jouent X ET Y jouent A.
+    import_teams(
+        client, "F3", [["X", "Y", "A"]] * 2 + [["X", "B"]] * 3 + [["Y", "B"]] * 3
+    )
+    one = client.get("/api/suggestions?format=F3&pokemon=X").json()
+    assert one[0]["pokemon"] == "B"
+    two = client.get("/api/suggestions?format=F3&pokemon=X&pokemon=Y").json()
+    assert [r["pokemon"] for r in two] == ["A", "B"]
+    assert two[0]["close_teams"] == 2 and two[1]["close_teams"] == 6
+    assert (
+        two[0]["close_of"] == 8
+    )  # moins de 25 équipes partagent un Pokémon avec X et Y
+    assert (
+        two[0]["score"] < two[1]["score"]
+    )  # la co-occurrence seule aurait mis B en premier
+
+
+def test_similar_teams(client, db):
+    import_teams(client, "F4", [["X", "Y", "A"], ["X", "B"], ["C", "D"]])
+    rows = client.get("/api/similar-teams?format=F4&pokemon=X&pokemon=Y").json()
+    assert [r["pokemon"] for r in rows] == [
+        ["A", "X", "Y"],
+        ["B", "X"],
+    ]  # C D : rien en commun
+    assert rows[0]["similarity"] == pytest.approx(2 / 3, abs=1e-4)
+    assert rows[0]["player"] == "F4-p0" and rows[0]["placement"] == 1
+    assert (rows[0]["wins"], rows[0]["losses"], rows[0]["tournament"]) == (3, 2, "F4")
+    assert client.get("/api/similar-teams?format=F4&pokemon=Z").json() == []

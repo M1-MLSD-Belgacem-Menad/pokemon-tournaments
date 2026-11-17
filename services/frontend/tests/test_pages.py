@@ -478,6 +478,8 @@ def stats_api(monkeypatch):
                 "pokemon": "Z",
                 "sprite": None,
                 "score": -1.2,
+                "close_teams": 14,
+                "close_of": 25,
                 "partners": [
                     {
                         "partner": "X",
@@ -499,6 +501,40 @@ def stats_api(monkeypatch):
                         "winrate": None,
                     },
                 ],
+            }
+        ],
+        f"http://api/api/archetypes/match?{q}": {
+            "archetype": {
+                "name": "X / Y",
+                "divers": False,
+                "teams": 120,
+                "share": 0.0812,
+                "winrate": 0.531,
+                "ci_low": 0.51,
+                "ci_high": 0.55,
+                "low_data": False,
+                "top_cut_rate": 0.1766,
+                "top_cut_low": 0.14,
+                "top_cut_high": 0.21,
+                "pokemon": [
+                    {"pokemon": "X", "sprite": None, "share": 1.0},
+                    {"pokemon": "Z", "sprite": None, "share": 0.62},
+                ],
+            },
+            "runner_up": {"name": "Y / Z", "divers": False},
+            "indicative": True,
+        },
+        f"http://api/api/similar-teams?{q}": [
+            {
+                "player": "Ash",
+                "tournament_id": 7,
+                "tournament": "Cup",
+                "date": "2026-11-01",
+                "placement": 2,
+                "wins": 6,
+                "losses": 1,
+                "similarity": 0.3333,
+                "pokemon": ["A", "B", "C", "D", "X", "Y"],
             }
         ],
     }
@@ -544,7 +580,7 @@ def test_builder_fiabilite_et_suggestions(stats_api):
         ' <span class="tag low-data">peu de données</span>' in resp.text
     )
     assert (
-        "Classement par fréquence d'association" in resp.text
+        "les 25 équipes de tournoi les plus proches" in resp.text
         and "Modèle :" not in resp.text
     )
     assert 'href="/builder?format=F1&amp;p=X&amp;p=Y&amp;p=Z">Ajouter Z' in resp.text
@@ -745,3 +781,45 @@ def test_feuille_de_style_versionnee():
     html = client.get("/login").text
     assert f'href="{main.STYLE_URL}"' in html and "?v=" in main.STYLE_URL
     assert client.get(main.STYLE_URL).status_code == 200
+
+
+def test_builder_equipes_proches(stats_api):
+    resp = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]}).text
+    assert "Joué par <strong>14</strong> des 25 équipes les plus proches" in resp
+    assert '<a class="strong" href="/tournaments/7">Cup</a>' in resp
+    assert "Ash, 2<sup>e</sup>" in resp and "2 Pokémon en commun" in resp
+    assert (
+        '<span class="tag shared">X</span>' in resp
+        and '<span class="tag">A</span>' in resp
+    )
+
+
+def test_builder_archetype(stats_api):
+    resp = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]}).text
+    assert "<strong>X / Y</strong>" in resp and "120 équipes, 8 % du format" in resp
+    assert (
+        "Winrate : <strong>53.1 %</strong>" in resp
+        and "Top 8 : <strong>18 %</strong>" in resp
+    )
+    assert (
+        '<span class="tag shared">X 100 %</span>' in resp
+        and '<span class="tag">Z 62 %</span>' in resp
+    )
+    assert "n'est qu'une indication" in resp and "Proche aussi de : Y / Z." in resp
+
+
+def test_builder_sans_archetype_si_l_api_echoue(stats_api):
+    stats_api[0]["http://api/api/archetypes/match?format=F1&pokemon=X&pokemon=Y"] = 404
+    resp = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]})
+    assert resp.status_code == 200 and "Archétype de ton équipe" not in resp.text
+
+
+def test_builder_pas_d_archetype_net(stats_api):
+    url = "http://api/api/archetypes/match?format=F1&pokemon=X&pokemon=Y"
+    stats_api[0][url] = {
+        "archetype": None,
+        "runner_up": {"name": "Y / Z", "divers": False},
+        "indicative": False,
+    }
+    resp = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]}).text
+    assert "Pas d'archétype net" in resp and "La plus proche : Y / Z." in resp

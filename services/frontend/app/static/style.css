@@ -157,6 +157,10 @@ fieldset label { flex-direction: row; align-items: center; gap: 0.5rem; font-wei
 .cards > span { display: flex; flex-direction: column; align-items: center; padding: 0.3rem 0.2rem; border-radius: var(--radius); background: var(--bg); text-align: center; min-width: 0; }
 .cards strong { font-size: 0.8rem; overflow-wrap: anywhere; }
 .cards small { font-size: 0.72rem; color: var(--muted); overflow-wrap: anywhere; }
+.similar { display: grid; gap: 0.6rem; list-style: none; margin: 0; padding: 0; }
+.similar p, .archetype p { margin: 0 0 0.3rem; font-size: 0.9rem; }
+.similar-team { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.similar-team .shared { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .hint { margin: 0 0 0.5rem; font-size: 0.85rem; }
 /* Pokémon les plus joués : une seule bande de pastilles */
 .usage { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem; margin: 0 0 1rem; font-size: 0.85rem; }
