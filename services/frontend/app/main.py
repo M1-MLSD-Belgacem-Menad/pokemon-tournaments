@@ -337,6 +337,7 @@ def builder_page(request: Request, fmt: str | None, chosen: list[str], **extra):
             }
             if len(chosen) < TEAM_SIZE:
                 ctx["suggestions"] = suggestions(fmt, chosen)
+            ctx["archetype"] = optional(f"/api/archetypes/match?{q}")
             if len(chosen) >= 2:  # avec un seul Pokémon, toutes ses équipes se valent
                 ctx["similar"] = optional(f"/api/similar-teams?{q}")
     if token := request.cookies.get("token"):

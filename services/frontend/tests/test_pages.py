@@ -502,6 +502,27 @@ def stats_api(monkeypatch):
                 ],
             }
         ],
+        f"http://api/api/archetypes/match?{q}": {
+            "archetype": {
+                "name": "X / Y",
+                "divers": False,
+                "teams": 120,
+                "share": 0.0812,
+                "winrate": 0.531,
+                "ci_low": 0.51,
+                "ci_high": 0.55,
+                "low_data": False,
+                "top_cut_rate": 0.1766,
+                "top_cut_low": 0.14,
+                "top_cut_high": 0.21,
+                "pokemon": [
+                    {"pokemon": "X", "sprite": None, "share": 1.0},
+                    {"pokemon": "Z", "sprite": None, "share": 0.62},
+                ],
+            },
+            "runner_up": {"name": "Y / Z", "divers": False},
+            "indicative": True,
+        },
         f"http://api/api/similar-teams?{q}": [
             {
                 "player": "Ash",
@@ -770,3 +791,23 @@ def test_builder_equipes_proches(stats_api):
         '<span class="tag shared">X</span>' in resp
         and '<span class="tag">A</span>' in resp
     )
+
+
+def test_builder_archetype(stats_api):
+    resp = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]}).text
+    assert "<strong>X / Y</strong>" in resp and "120 équipes, 8 % du format" in resp
+    assert (
+        "Winrate : <strong>53.1 %</strong>" in resp
+        and "Top 8 : <strong>18 %</strong>" in resp
+    )
+    assert (
+        '<span class="tag shared">X 100 %</span>' in resp
+        and '<span class="tag">Z 62 %</span>' in resp
+    )
+    assert "n'est qu'une indication" in resp and "Proche aussi de : Y / Z." in resp
+
+
+def test_builder_sans_archetype_si_l_api_echoue(stats_api):
+    stats_api[0]["http://api/api/archetypes/match?format=F1&pokemon=X&pokemon=Y"] = 404
+    resp = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]})
+    assert resp.status_code == 200 and "Archétype de ton équipe" not in resp.text
