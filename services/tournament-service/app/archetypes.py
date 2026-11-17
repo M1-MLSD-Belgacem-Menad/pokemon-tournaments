@@ -4,15 +4,13 @@ Reconnaître l'archétype d'une équipe = additionner en SQL les poids de ses Po
 et garder le plus grand score, sans NumPy dans l'API. Méthode et limites : docs/07-apprentissage.md.
 """
 
-from typing import Annotated
-
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 
 from app.db import Conn
+from app.matchup import Team
 from app.stats import in_names, wilson, winrate
 
 router = APIRouter()
-Team = Annotated[list[str], Query(alias="pokemon", min_length=1, max_length=6)]
 TOP_POKEMON = 6  # Pokémon les plus joués montrés sur la fiche d'un archétype
 # Moins de 3 Pokémon : archétype trouvé moins de 3 fois sur 4 (étude, docs/07).
 INDICATIVE_BELOW = 3
@@ -67,13 +65,13 @@ def archetypes(conn: Conn, format: str) -> list[dict]:
 
 
 @router.get("/api/archetypes/match")
-def match(conn: Conn, format: str, team: Team) -> dict:
+def match(conn: Conn, format: str, pokemon: Team) -> dict:
     """Archétype le plus proche d'une équipe (1 à 6 Pokémon) et le suivant.
 
     `archetype` vaut None si le plus proche est le groupe « divers » ou si aucun Pokémon n'est connu.
     `indicative` : moins de 3 Pokémon, l'archétype trouvé n'est qu'une indication.
     """
-    names = sorted(set(team))
+    names = sorted(set(pokemon))
     with conn.cursor() as cur:
         cards = load_archetypes(cur, format)
         where, args = in_names("pk.name", names)

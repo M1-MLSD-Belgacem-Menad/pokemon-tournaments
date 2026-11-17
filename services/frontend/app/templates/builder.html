@@ -37,7 +37,7 @@
 {% for s in suggestions %}{% set best = s.partners[0] %}
   <li class="panel">
     <span class="mon-name">{% if s.sprite %}<img class="sprite" src="{{ s.sprite }}" alt="" width="40" height="40">{% endif %}{{ s.pokemon }}</span>
-    {% if s.close_teams %}<p>Joué par <strong>{{ s.close_teams }}</strong> des 25 équipes les plus proches de la tienne.</p>{% endif %}
+    {% if s.close_teams %}<p>Joué par <strong>{{ s.close_teams }}</strong> des {{ s.close_of }} équipes les plus proches de la tienne.</p>{% endif %}
     {% if best.teams %}<p>Joué avec {{ best.partner }} dans <strong>{{ "%.0f" | format(best.share * 100) }} %</strong> de ses équipes.</p>
     {% if best.winrate is not none %}<p class="meta">Ensemble : {{ "%.0f" | format(best.winrate * 100) }} % de victoires {{ reliability(best) }}</p>{% endif %}
     {% else %}<p class="meta">Jamais joué avec les Pokémon choisis.</p>{% endif %}
@@ -47,11 +47,15 @@
 </ul>
 <p class="meta">Avec un seul Pokémon : classement par fréquence d'association dans les équipes de ce format. À partir de deux : les 25 équipes de tournoi les plus proches de la tienne votent pour leurs autres Pokémon. Ce sont les méthodes qui retrouvent le mieux les choix réels des joueurs (voir la documentation). Le winrate des équipes qui jouent la paire est affiché à titre indicatif : il dépend aussi du niveau des joueurs et ne sert pas au classement.</p>
 {% endif %}
+{% if archetype and not archetype.archetype and archetype.runner_up and not archetype.runner_up.divers %}
+<h2>Archétype de ton équipe</h2>
+<p class="hint">Pas d'archétype net : ton équipe sort des familles habituelles du format. La plus proche : {{ archetype.runner_up.name }}.</p>
+{% endif %}
 {% if archetype and archetype.archetype %}{% set a = archetype.archetype %}
 <h2>Archétype de ton équipe</h2>
 <div class="panel archetype">
   <p><strong>{{ a.name }}</strong> <span class="meta">· {{ a.teams }} équipes, {{ "%.0f" | format(a.share * 100) }} % du format</span></p>
-  <p>Winrate : <strong>{{ "%.1f" | format(a.winrate * 100) }} %</strong> {{ reliability(a) }}{% if a.top_cut_rate is not none %} · Top 8 : <strong>{{ "%.0f" | format(a.top_cut_rate * 100) }} %</strong> <span class="ci">{{ (a.top_cut_low * 100) | round | int }}–{{ (a.top_cut_high * 100) | round | int }} %</span>{% endif %}</p>
+  <p>Winrate : <strong>{{ pct(a) }}</strong> {{ reliability(a) }}{% if a.top_cut_rate is not none %} · Top 8 : <strong>{{ "%.0f" | format(a.top_cut_rate * 100) }} %</strong> <span class="ci">{{ (a.top_cut_low * 100) | round | int }}–{{ (a.top_cut_high * 100) | round | int }} %</span>{% endif %}</p>
   <p class="similar-team">{% for p in a.pokemon %}<span class="tag{% if p.pokemon in chosen %} shared{% endif %}">{{ p.pokemon }} {{ "%.0f" | format(p.share * 100) }} %</span>{% endfor %}</p>
   {% if archetype.indicative %}<p class="meta">Avec moins de trois Pokémon, l'archétype n'est qu'une indication.</p>{% endif %}
   {% if archetype.runner_up and not archetype.runner_up.divers %}<p class="meta">Proche aussi de : {{ archetype.runner_up.name }}.</p>{% endif %}
@@ -64,7 +68,7 @@
 {% for t in similar %}
   <li class="panel">
     <p><a class="strong" href="/tournaments/{{ t.tournament_id }}">{{ t.tournament }}</a> <span class="meta">{{ t.date }}</span></p>
-    <p>{{ t.player }}{% if t.placement %}, {{ t.placement }}<sup>e</sup>{% endif %}{% if t.wins is not none %} <span class="meta">({{ t.wins }}-{{ t.losses }})</span>{% endif %} · <span class="meta">{{ t.pokemon | select("in", chosen) | list | length }} Pokémon en commun</span></p>
+    <p>{{ t.player }}{% if t.placement %}, {{ t.placement }}<sup>{{ "er" if t.placement == 1 else "e" }}</sup>{% endif %}{% if t.wins is not none and t.losses is not none %} <span class="meta">({{ t.wins }}-{{ t.losses }})</span>{% endif %} · <span class="meta">{{ t.pokemon | select("in", chosen) | list | length }} Pokémon en commun</span></p>
     <p class="similar-team">{% for p in t.pokemon %}<span class="tag{% if p in chosen %} shared{% endif %}">{{ p }}</span>{% endfor %}</p>
   </li>
 {% endfor %}

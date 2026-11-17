@@ -115,7 +115,14 @@ def test_suggestions_list_every_legal_pokemon(client, data):
     assert sorted(r["pokemon"] for r in rows) == ["B", "C", "D", "Faible", "Fort"]
     assert rows[-1]["pokemon"] == "C" and rows[-1]["partners"][0]["teams"] == 0
     assert rows[-1]["partners"][0]["winrate"] is None
-    assert set(rows[0]) == {"pokemon", "sprite", "score", "partners", "close_teams"}
+    assert set(rows[0]) == {
+        "pokemon",
+        "sprite",
+        "score",
+        "partners",
+        "close_teams",
+        "close_of",
+    }
     assert (
         rows[0]["close_teams"] is None
     )  # un seul Pokémon : co-occurrence, pas de voisins
@@ -250,6 +257,9 @@ def test_suggestions_use_close_teams_from_two_pokemon(client, db):
     two = client.get("/api/suggestions?format=F3&pokemon=X&pokemon=Y").json()
     assert [r["pokemon"] for r in two] == ["A", "B"]
     assert two[0]["close_teams"] == 2 and two[1]["close_teams"] == 6
+    assert (
+        two[0]["close_of"] == 8
+    )  # moins de 25 équipes partagent un Pokémon avec X et Y
     assert (
         two[0]["score"] < two[1]["score"]
     )  # la co-occurrence seule aurait mis B en premier

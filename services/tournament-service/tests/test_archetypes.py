@@ -72,9 +72,10 @@ def test_no_archetypes_before_training(client, scattered_format):
     )
 
 
-def test_too_few_teams_no_archetypes(client, scattered_format, monkeypatch, capsys):
+def test_too_few_teams_no_archetypes(client, trained, monkeypatch, capsys):
+    assert client.get("/api/archetypes?format=F5").status_code == 200
     monkeypatch.setattr(train, "ARCHETYPE_MIN_TEAMS", 53)  # 52 équipes
-    train.main()
+    train.main()  # les archétypes de l'entraînement précédent sont effacés
     assert "pas d'archétypes" in capsys.readouterr().out
     assert client.get("/api/archetypes?format=F5").status_code == 404
 

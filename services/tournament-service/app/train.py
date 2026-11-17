@@ -387,6 +387,10 @@ def train_archetypes(conn, codes: dict[int, str]) -> None:
         by_format, ids = load_teams(cur)
         for format_id, teams in by_format.items():
             if len(teams) < ARCHETYPE_MIN_TEAMS:
+                store_archetypes(
+                    cur, format_id, [], ids
+                )  # pas d'anciens archétypes périmés
+                conn.commit()
                 print(
                     f"{codes[format_id]} : {len(teams)} équipes, pas d'archétypes (minimum {ARCHETYPE_MIN_TEAMS})"
                 )

@@ -5,6 +5,7 @@ sans scikit-learn dans l'API. Suggestions : fréquence d'association des Pokémo
 Méthode, formules, mesures et limites : docs/07-apprentissage.md.
 """
 
+import heapq
 import math
 from collections import Counter
 from typing import Annotated
@@ -140,7 +141,7 @@ def neighbours(
         for rank, (i, t) in enumerate(teams.items())
         if s & t
     ]
-    return [(sim, i) for sim, _, i in sorted(sims, reverse=True)[:K_NEIGHBOURS]]
+    return [(sim, i) for sim, _, i in heapq.nlargest(K_NEIGHBOURS, sims)]
 
 
 @router.get("/api/suggestions")
@@ -160,7 +161,7 @@ def suggestions(
       n(p) = équipes qui jouent p, P(c) = (n(c) + 1) / (N + 1), α = 1 ;
     - deux Pokémon ou plus : k plus proches voisins. Les 25 équipes les plus proches de l'équipe en cours
       votent pour leurs autres Pokémon, chacune avec sa similarité ; la co-occurrence départage.
-      `close_teams` : nombre de ces équipes proches qui jouent le candidat.
+      `close_teams` : nombre de ces équipes proches qui jouent le candidat, sur `close_of` équipes proches.
 
     `partners` : pour chaque Pokémon choisi, part de ses équipes qui jouent aussi le candidat et winrate
     de ces équipes, à titre indicatif (il ne sert pas au classement).
@@ -207,16 +208,19 @@ def suggestions(
             key=lambda x: -x["teams"]
         )  # le partenaire le plus souvent associé d'abord
         out.append({"pokemon": c, "score": round(score, 4), "partners": partners})
-    votes, close = Counter(), Counter()
-    if (
+    votes, close, near = Counter(), Counter(), []
+    use_knn = (
         len(chosen) >= 2
-    ):  # avec un seul Pokémon, toutes ses équipes sont à égalité : pas de voisins
-        for sim, i in neighbours(teams, chosen):
+    )  # un seul Pokémon : toutes ses équipes à égalité, pas de voisins
+    if use_knn:
+        near = neighbours(teams, chosen)
+        for sim, i in near:
             for c in teams[i] - set(chosen):
                 votes[c] += sim
                 close[c] += 1
     for r in out:
-        r["close_teams"] = close[r["pokemon"]] if len(chosen) >= 2 else None
+        r["close_teams"] = close[r["pokemon"]] if use_knn else None
+        r["close_of"] = len(near) if use_knn else None
     out.sort(key=lambda s: (-votes[s["pokemon"]], -s["score"], s["pokemon"]))
     top = out[:limit]
     sprites = {

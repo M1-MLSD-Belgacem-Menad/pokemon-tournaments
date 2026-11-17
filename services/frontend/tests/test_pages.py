@@ -479,6 +479,7 @@ def stats_api(monkeypatch):
                 "sprite": None,
                 "score": -1.2,
                 "close_teams": 14,
+                "close_of": 25,
                 "partners": [
                     {
                         "partner": "X",
@@ -811,3 +812,14 @@ def test_builder_sans_archetype_si_l_api_echoue(stats_api):
     stats_api[0]["http://api/api/archetypes/match?format=F1&pokemon=X&pokemon=Y"] = 404
     resp = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]})
     assert resp.status_code == 200 and "Archétype de ton équipe" not in resp.text
+
+
+def test_builder_pas_d_archetype_net(stats_api):
+    url = "http://api/api/archetypes/match?format=F1&pokemon=X&pokemon=Y"
+    stats_api[0][url] = {
+        "archetype": None,
+        "runner_up": {"name": "Y / Z", "divers": False},
+        "indicative": False,
+    }
+    resp = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]}).text
+    assert "Pas d'archétype net" in resp and "La plus proche : Y / Z." in resp
