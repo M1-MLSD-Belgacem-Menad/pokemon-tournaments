@@ -8,9 +8,9 @@
 {% if not formats %}
 <p class="panel">Aucun tournoi en base : lancer le scraper d'abord.</p>
 {% else %}
-<p class="lead">Choisir jusqu'à six Pokémon parmi ceux joués dans le format pour voir leurs statistiques et leurs winrates.</p>
+<p class="lead">Choisir jusqu'à six Pokémon parmi ceux joués dans le format. À chaque choix, le site conseille les Pokémon qui vont le mieux avec l'équipe et affiche ses statistiques.</p>
 {% if saved %}<p class="ok" role="status">Équipe enregistrée.</p>{% endif %}
-<form method="get" action="/builder" class="panel">
+<form method="get" action="/builder" class="panel" id="builder">
   <div class="toolbar">
     <label>Format
       <select name="format">
@@ -29,6 +29,23 @@
   </div>
   <button>Voir les statistiques</button>
 </form>
+{% if not chosen %}<p class="hint">Choisir un premier Pokémon : le site proposera ceux qui sont le plus souvent joués avec lui.</p>
+{% elif chosen | length == size %}<p class="hint">Équipe complète. Vider une case pour voir quels Pokémon la compléteraient le mieux.</p>
+{% elif suggestions %}
+<h2>Pokémon à ajouter</h2>
+<ul class="suggestions">
+{% for s in suggestions %}{% set best = s.partners[0] %}
+  <li class="panel">
+    <span class="mon-name">{% if s.sprite %}<img class="sprite" src="{{ s.sprite }}" alt="" width="40" height="40">{% endif %}{{ s.pokemon }}</span>
+    {% if best.teams %}<p>Joué avec {{ best.partner }} dans <strong>{{ "%.0f" | format(best.share * 100) }} %</strong> de ses équipes.</p>
+    {% if best.winrate is not none %}<p class="meta">Ensemble : {{ "%.0f" | format(best.winrate * 100) }} % de victoires {{ reliability(best) }}</p>{% endif %}
+    {% else %}<p class="meta">Jamais joué avec les Pokémon choisis.</p>{% endif %}
+    <a class="button add" href="/builder?{{ s.query }}">Ajouter {{ s.pokemon }}</a>
+  </li>
+{% endfor %}
+</ul>
+<p class="meta">Classement par fréquence d'association avec les Pokémon déjà choisis dans les équipes de ce format. C'est la méthode qui retrouve le mieux les choix réels des joueurs (voir la documentation). Le winrate des équipes qui jouent la paire est affiché à titre indicatif : il dépend aussi du niveau des joueurs et ne sert pas au classement.</p>
+{% endif %}
 
 {% if stats is defined %}
 <h2>Mon équipe</h2>
@@ -42,21 +59,6 @@
 {% endfor %}
 </ul>
 <p><a class="button" href="/versus?format={{ format | urlencode }}{% for p in chosen %}&amp;a={{ p | urlencode }}{% endfor %}">Tester cette équipe en face-à-face</a></p>
-{% if suggestions %}
-<h2>Pokémon à ajouter</h2>
-<ul class="suggestions">
-{% for s in suggestions %}{% set best = s.partners[0] %}
-  <li class="panel">
-    <span class="mon-name">{% if s.sprite %}<img class="sprite" src="{{ s.sprite }}" alt="" width="40" height="40">{% endif %}{{ s.pokemon }}</span>
-    {% if best.teams %}<p>Joué avec {{ best.partner }} dans <strong>{{ "%.0f" | format(best.share * 100) }} %</strong> de ses équipes.</p>
-    {% if best.winrate is not none %}<p class="meta">Ensemble : {{ "%.0f" | format(best.winrate * 100) }} % de victoires {{ reliability(best) }}</p>{% endif %}
-    {% else %}<p class="meta">Jamais joué avec les Pokémon choisis.</p>{% endif %}
-    <a class="button" href="/builder?{{ s.query }}">Ajouter {{ s.pokemon }}</a>
-  </li>
-{% endfor %}
-</ul>
-<p class="meta">Classement par fréquence d'association avec les Pokémon déjà choisis dans les équipes de ce format. C'est la méthode qui retrouve le mieux les choix réels des joueurs (voir la documentation). Le winrate des équipes qui jouent la paire est affiché à titre indicatif : il dépend aussi du niveau des joueurs et ne sert pas au classement.</p>
-{% endif %}
 <h2>Statistiques de base</h2>
 <div class="scroll">
 <table>
@@ -122,4 +124,29 @@
 </ul>
 {% endif %}
 {% endif %}
+<script>
+  // Mise à jour sans recharger la page à chaque choix (sans JavaScript, le bouton du formulaire suffit)
+  let last = 0;
+  async function show(url) {
+    const n = ++last;
+    const main = await fetch(url)
+      .then((r) => (r.ok ? r.text() : ""))
+      .then((html) => new DOMParser().parseFromString(html, "text/html").querySelector("main"))
+      .catch(() => null);
+    if (n !== last) return; // un choix plus récent est déjà en route
+    if (!main) return (location.href = url); // erreur : chargement classique, avec la page d'erreur du site
+    const focusable = () => document.querySelectorAll("#builder select, a.add"); // garder le focus clavier
+    const focused = [...focusable()].indexOf(document.activeElement);
+    document.querySelector("main").replaceWith(main);
+    focusable()[focused]?.focus();
+    history.replaceState(null, "", url);
+  }
+  document.addEventListener("change", (e) => {
+    if (e.target.form?.id === "builder") show("/builder?" + new URLSearchParams(new FormData(e.target.form)));
+  });
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("a.add");
+    if (a && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button)) { e.preventDefault(); show(a.href); }
+  });
+</script>
 {% endblock %}

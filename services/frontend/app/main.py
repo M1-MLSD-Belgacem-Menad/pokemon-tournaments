@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import re
@@ -38,6 +39,9 @@ templates.env.filters["flag"] = lambda c: (
     if re.fullmatch(r"[A-Za-z]{2}", c or "")
     else None
 )
+# Adresse de la feuille de style qui change avec son contenu : le navigateur ne garde pas l'ancienne après une mise à jour.
+STYLE_URL = f"/static/style.css?v={hashlib.sha256((HERE / 'static/style.css').read_bytes()).hexdigest()[:8]}"
+templates.env.globals["style_url"] = STYLE_URL
 app = FastAPI(title="frontend")
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
