@@ -478,6 +478,7 @@ def stats_api(monkeypatch):
                 "pokemon": "Z",
                 "sprite": None,
                 "score": -1.2,
+                "close_teams": 14,
                 "partners": [
                     {
                         "partner": "X",
@@ -499,6 +500,19 @@ def stats_api(monkeypatch):
                         "winrate": None,
                     },
                 ],
+            }
+        ],
+        f"http://api/api/similar-teams?{q}": [
+            {
+                "player": "Ash",
+                "tournament_id": 7,
+                "tournament": "Cup",
+                "date": "2026-11-01",
+                "placement": 2,
+                "wins": 6,
+                "losses": 1,
+                "similarity": 0.3333,
+                "pokemon": ["A", "B", "C", "D", "X", "Y"],
             }
         ],
     }
@@ -544,7 +558,7 @@ def test_builder_fiabilite_et_suggestions(stats_api):
         ' <span class="tag low-data">peu de données</span>' in resp.text
     )
     assert (
-        "Classement par fréquence d'association" in resp.text
+        "les 25 équipes de tournoi les plus proches" in resp.text
         and "Modèle :" not in resp.text
     )
     assert 'href="/builder?format=F1&amp;p=X&amp;p=Y&amp;p=Z">Ajouter Z' in resp.text
@@ -745,3 +759,14 @@ def test_feuille_de_style_versionnee():
     html = client.get("/login").text
     assert f'href="{main.STYLE_URL}"' in html and "?v=" in main.STYLE_URL
     assert client.get(main.STYLE_URL).status_code == 200
+
+
+def test_builder_equipes_proches(stats_api):
+    resp = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]}).text
+    assert "Joué par <strong>14</strong> des 25 équipes les plus proches" in resp
+    assert '<a class="strong" href="/tournaments/7">Cup</a>' in resp
+    assert "Ash, 2<sup>e</sup>" in resp and "2 Pokémon en commun" in resp
+    assert (
+        '<span class="tag shared">X</span>' in resp
+        and '<span class="tag">A</span>' in resp
+    )

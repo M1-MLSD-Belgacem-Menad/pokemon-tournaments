@@ -109,8 +109,17 @@ def predict(conn: Conn, format: str, a: Team, b: Team) -> dict:
 
 
 def format_teams(cur, format_code: str) -> dict[int, set[str]]:
-    """Équipes du format (tournois scrapés) : id du classement -> noms de ses Pokémon."""
-    cur.execute("SELECT tp.standing_id AS id, pk.name" + FORMAT_TEAMS, (format_code,))
+    """Équipes du format (tournois scrapés) : id du classement -> noms de ses Pokémon.
+
+    Rangées de la moins bonne à la meilleure (victoires, puis la plus récente) : `neighbours` s'en sert
+    pour départager deux équipes aussi proches.
+    """
+    cur.execute(
+        "SELECT tp.standing_id AS id, pk.name"
+        + FORMAT_TEAMS
+        + " ORDER BY COALESCE(s.wins, 0), t.date, s.id",
+        (format_code,),
+    )
     teams: dict[int, set[str]] = {}
     for r in cur.fetchall():
         teams.setdefault(r["id"], set()).add(r["name"])
@@ -123,11 +132,15 @@ def neighbours(
     """Les K équipes les plus proches des Pokémon choisis : (similarité, id), la plus proche d'abord.
 
     Similarité = Jaccard au carré, |S ∩ T|² / |S ∪ T|² : une équipe qui partage 4 Pokémon pèse bien plus
-    qu'une équipe qui en partage 2. À similarité égale, l'équipe la plus récente (id le plus grand) d'abord.
+    qu'une équipe qui en partage 2. À similarité égale, celle qui a le plus de victoires, puis la plus récente.
     """
     s = set(chosen)
-    sims = [((len(s & t) / len(s | t)) ** 2, i) for i, t in teams.items() if s & t]
-    return sorted(sims, reverse=True)[:K_NEIGHBOURS]
+    sims = [
+        ((len(s & t) / len(s | t)) ** 2, rank, i)
+        for rank, (i, t) in enumerate(teams.items())
+        if s & t
+    ]
+    return [(sim, i) for sim, _, i in sorted(sims, reverse=True)[:K_NEIGHBOURS]]
 
 
 @router.get("/api/suggestions")

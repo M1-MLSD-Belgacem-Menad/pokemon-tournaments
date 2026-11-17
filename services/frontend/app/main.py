@@ -284,15 +284,19 @@ def clean_team(team: list[str], legal: list[str]) -> list[str]:
     return list(dict.fromkeys(p for p in team if p in allowed))[:TEAM_SIZE]
 
 
+def optional(path: str):
+    """Section facultative d'une page : None si l'API échoue, le reste de la page s'affiche."""
+    try:
+        return api_get(path)
+    except HTTPException:
+        return None
+
+
 def suggestions(fmt: str, chosen: list[str]) -> list[dict] | None:
     """Pokémon à ajouter à l'équipe (API), avec le lien qui l'ajoute ; None si l'API échoue."""
-    try:
-        rows = api_get(
-            f"/api/suggestions?{urlencode({'format': fmt, 'pokemon': chosen}, doseq=True)}"
-        )
-    except HTTPException:  # section facultative : le reste du créateur s'affiche
-        return None
-    for r in rows:
+    q = urlencode({"format": fmt, "pokemon": chosen}, doseq=True)
+    rows = optional(f"/api/suggestions?{q}")
+    for r in rows or []:
         r["query"] = urlencode(
             {"format": fmt, "p": [*chosen, r["pokemon"]]}, doseq=True
         )
@@ -333,6 +337,8 @@ def builder_page(request: Request, fmt: str | None, chosen: list[str], **extra):
             }
             if len(chosen) < TEAM_SIZE:
                 ctx["suggestions"] = suggestions(fmt, chosen)
+            if len(chosen) >= 2:  # avec un seul Pokémon, toutes ses équipes se valent
+                ctx["similar"] = optional(f"/api/similar-teams?{q}")
     if token := request.cookies.get("token"):
         try:
             ctx["teams"] = api_get("/api/teams", token)
