@@ -56,8 +56,23 @@ class Login(BaseModel):
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    """Sonde liveness/readiness pour Kubernetes."""
+    """Sonde liveness : le processus répond, sans toucher à la base."""
     return {"status": "ok"}
+
+
+@app.get("/ready")
+def ready() -> dict[str, str]:
+    """Sonde readiness : la base répond (503 sinon, le pod sort du Service sans être redémarré)."""
+    try:
+        conn = connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+        finally:
+            conn.close()
+    except pymysql.MySQLError as e:
+        raise HTTPException(503, "base de données injoignable") from e
+    return {"status": "ready"}
 
 
 @app.post("/api/auth/register", status_code=201)

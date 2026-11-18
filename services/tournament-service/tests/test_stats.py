@@ -49,7 +49,7 @@ def data(client, db):
         "date": "2026-10-02",
         "format": "F1",
         "detail_level": "winner",
-        "standings": [{"placement": 1, "player": "Zed", "team": ["V"]}],
+        "standings": [{"placement": 1, "player": "Zed", "team": ["W"]}],
     }
     assert (
         client.post("/api/tournaments", json=local, headers=auth()).status_code == 201
@@ -141,12 +141,15 @@ def test_local_formats_are_not_listed(client, data):
     local = {
         "name": "Futur",
         "date": "2062-01-01",
-        "format": "Local seulement",
+        "format": "F2",
         "detail_level": "winner",
         "standings": [{"placement": 1, "player": "A"}],
     }
-    client.post("/api/tournaments", json=local, headers=auth())
-    assert client.get("/api/formats").json()[0]["code"] == "F1"
+    assert (
+        client.post("/api/tournaments", json=local, headers=auth()).status_code == 201
+    )
+    # Le tournoi local, plus récent, ne change ni la liste ni l'ordre des formats.
+    assert [f["code"] for f in client.get("/api/formats").json()] == ["F1", "F2"]
 
 
 def test_pokemon_page(client, db):
@@ -208,3 +211,24 @@ def test_reliable_winrate_fields():
     assert (
         none["winrate"] is None and none["winrate_smoothed"] == 0.5 and none["low_data"]
     )
+
+
+def test_matchups_batch_same_as_single_calls(client, data):
+    params = {"format": "F1", "pokemon": ["X", "Y", "X"], "limit": 2}
+    got = client.get("/api/stats/matchups/batch", params=params).json()
+    assert list(got) == ["X", "Y"]  # doublon ignoré
+    for name in got:
+        single = client.get(
+            "/api/stats/matchups", params={"format": "F1", "pokemon": name, "limit": 2}
+        ).json()
+        assert got[name] == single
+    assert [(r["opponent"], r["games"]) for r in got["X"]] == [("Z", 5), ("Y", 3)]
+
+
+@pytest.mark.parametrize(
+    "params",
+    [{"format": "F1"}, {"format": "F1", "pokemon": ["X"] * 7}, {"pokemon": ["X"]}],
+    ids=["sans-pokemon", "sept", "sans-format"],
+)
+def test_matchups_batch_invalid_422(client, data, params):
+    assert client.get("/api/stats/matchups/batch", params=params).status_code == 422

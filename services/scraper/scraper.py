@@ -12,6 +12,7 @@ La base sert de cache : un nom enrichi n'est plus jamais redemandé.
 """
 
 import datetime
+import math
 import os
 import re
 import sys
@@ -25,17 +26,31 @@ from google.protobuf import json_format
 API = "https://play.limitlesstcg.com/api"
 HEADERS = {"User-Agent": "M1-projet-pokemon/0.1 (projet etudiant)"}
 DELAY = 1  # secondes entre deux requêtes vers Limitless
+RETRY_DEFAULT, RETRY_MAX = 10, 60  # attente après un 429, sans Retry-After / au plus
 # Import par gRPC (contrat : tournament.proto, copie de celui du tournament-service).
 protos, services = grpc.protos_and_services("tournament.proto")
+
+
+def retry_after(resp):
+    """Secondes à attendre après un 429 : Retry-After si c'est un nombre, sinon 10 ; au plus 60."""
+    try:
+        wait = float(resp.headers.get("Retry-After", RETRY_DEFAULT))
+    except ValueError:  # Retry-After peut être une date : on prend la valeur par défaut
+        wait = RETRY_DEFAULT
+    return min(max(wait, 0), RETRY_MAX) if math.isfinite(wait) else RETRY_DEFAULT
 
 
 def get_json(url, delay, params=None, missing_ok=False):
     """GET JSON poli : pause avant la requête (même après une erreur), User-Agent explicite.
 
     missing_ok : None pour un 404 au lieu d'une erreur.
+    429 (trop de requêtes) : une seule nouvelle tentative, après le délai de Retry-After.
     """
     time.sleep(delay)
     resp = requests.get(url, params=params, headers=HEADERS, timeout=20)
+    if resp.status_code == 429:
+        time.sleep(retry_after(resp))
+        resp = requests.get(url, params=params, headers=HEADERS, timeout=20)
     if missing_ok and resp.status_code == 404:
         return None
     resp.raise_for_status()

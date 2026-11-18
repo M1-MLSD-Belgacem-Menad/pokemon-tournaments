@@ -168,13 +168,26 @@ def tournaments(request: Request):
     )
 
 
+def entry_context(form: dict, **extra) -> dict:
+    """Contexte du formulaire de saisie : formats connus et Pokémon légaux du format choisi (le courant par défaut)."""
+    formats = api_get("/api/formats")
+    fmt = form.get("format") or (formats[0]["code"] if formats else None)
+    legal = api_get(f"/api/formats/{quote(fmt, safe='')}/legal-pokemon") if fmt else []
+    return {
+        "rows": ROWS,
+        "size": TEAM_SIZE,
+        "form": form,
+        "formats": formats,
+        "format": fmt,
+        "legal": legal,
+    } | extra
+
+
 @app.get("/tournaments/new", response_class=HTMLResponse)
 def new_tournament_form(request: Request):
     if "token" not in request.cookies:
         return RedirectResponse("/login", status_code=303)
-    return templates.TemplateResponse(
-        request, "new_tournament.html", {"rows": ROWS, "size": TEAM_SIZE, "form": {}}
-    )
+    return templates.TemplateResponse(request, "new_tournament.html", entry_context({}))
 
 
 @app.post("/tournaments/new", response_class=HTMLResponse)
@@ -200,9 +213,11 @@ async def new_tournament(request: Request):
     ]
 
     def page(error: str, status_code: int):
-        context = {"rows": ROWS, "size": TEAM_SIZE, "form": form, "error": error}
         return templates.TemplateResponse(
-            request, "new_tournament.html", context, status_code=status_code
+            request,
+            "new_tournament.html",
+            entry_context(form, error=error),
+            status_code=status_code,
         )
 
     filled = {s["placement"] for s in standings}
@@ -329,12 +344,8 @@ def builder_page(request: Request, fmt: str | None, chosen: list[str], **extra):
             }
             ctx["stats"] = api_get(f"/api/stats/pokemon?{q}")
             ctx["pairs"] = api_get(f"/api/stats/combinations?{q}")
-            ctx["matchups"] = {
-                p: api_get(
-                    f"/api/stats/matchups?{urlencode({'format': fmt, 'pokemon': p, 'limit': 5})}"
-                )
-                for p in chosen
-            }
+            q5 = urlencode({"format": fmt, "pokemon": chosen, "limit": 5}, doseq=True)
+            ctx["matchups"] = api_get(f"/api/stats/matchups/batch?{q5}")
             if len(chosen) < TEAM_SIZE:
                 ctx["suggestions"] = suggestions(fmt, chosen)
             ctx["archetype"] = optional(f"/api/archetypes/match?{q}")

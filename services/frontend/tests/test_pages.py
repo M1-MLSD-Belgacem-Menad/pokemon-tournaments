@@ -75,6 +75,18 @@ class FakeResponse(io.BytesIO):
     status = 200
 
 
+ENTRY = {  # listes du formulaire de saisie (formats connus, Pokémon légaux du format)
+    "http://api/api/formats": [{"code": "M-C"}, {"code": "M-B"}],
+    "http://api/api/formats/M-C/legal-pokemon": ["Pikachu", "Onix"],
+    "http://api/api/formats/M-B/legal-pokemon": ["Evoli"],
+}
+
+
+def posts(sent):
+    """Les envois avec un corps (POST), sans les GET des listes du formulaire."""
+    return [x for x in sent if x[1] is not None]
+
+
 def fake_urlopen(responses, sent=None):
     """Remplace les appels HTTP aux services : URL -> JSON, (code, JSON) ou code d'erreur.
 
@@ -258,7 +270,7 @@ def sent(monkeypatch):
         ),
         "http://users/api/auth/register": (201, {"id": 1}),
         "http://api/api/tournaments": (201, {"id": 42}),
-    }
+    } | ENTRY
     monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses, sent))
     return sent
 
@@ -323,6 +335,37 @@ def test_saisie_sans_connexion_redirige():
     )
 
 
+def test_saisie_propose_formats_et_pokemon_legaux(sent):
+    c = TestClient(main.app, cookies={"token": "jeton"})
+    html = c.get("/tournaments/new").text
+    assert '<select name="format"' in html
+    assert "<option selected>M-C</option><option>M-B</option>" in html
+    assert (
+        '<datalist id="pokemon"><option value="Pikachu"><option value="Onix">' in html
+    )
+    assert 'name="mon_1_1" list="pokemon"' in html
+
+
+def test_saisie_en_erreur_garde_le_format_choisi(monkeypatch):
+    responses = {
+        "http://api/api/tournaments": (422, {"detail": "Pokémon inconnus : Evoli"}),
+    } | ENTRY
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
+    form = {
+        "name": "Club",
+        "date": "2026-10-12",
+        "format": "M-B",
+        "detail_level": "top16",
+        "player_1": "Ash",
+    }
+    resp = TestClient(main.app, cookies={"token": "jeton"}).post(
+        "/tournaments/new", data=form
+    )
+    assert resp.status_code == 422 and "Pokémon inconnus" in resp.text
+    assert "<option selected>M-B</option>" in resp.text
+    assert '<option value="Evoli">' in resp.text
+
+
 def test_saisie_envoie_les_lignes_remplies_avec_le_jeton(sent):
     c = TestClient(main.app, cookies={"token": "jeton"})
     assert "Joueur 16" in c.get("/tournaments/new").text  # 16 lignes
@@ -338,7 +381,7 @@ def test_saisie_envoie_les_lignes_remplies_avec_le_jeton(sent):
     }
     resp = c.post("/tournaments/new", data=form, follow_redirects=False)
     assert resp.headers["location"] == "/tournaments/42"
-    _, data, auth = sent[0]
+    _, data, auth = posts(sent)[0]
     assert auth == "Bearer jeton"
     assert data["standings"] == [
         {"placement": 1, "player": "Ash", "team": ["Pikachu"]},
@@ -359,14 +402,14 @@ def test_vainqueur_seul_n_envoie_que_la_ligne_1(sent):
         data=form | {"player_1": "Ash", "player_2": "Misty"},
         follow_redirects=False,
     )
-    assert [s["player"] for s in sent[0][1]["standings"]] == ["Ash"]
+    assert [s["player"] for s in posts(sent)[0][1]["standings"]] == ["Ash"]
 
 
 def test_erreur_de_validation_reaffiche_le_formulaire(monkeypatch):
     error = {
         "detail": [{"msg": "Value error, les places doivent se suivre à partir de 1"}]
     }
-    responses = {"http://api/api/tournaments": (422, error)}
+    responses = {"http://api/api/tournaments": (422, error)} | ENTRY
     monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
     c = TestClient(main.app, cookies={"token": "jeton"})
     form = {
@@ -381,8 +424,28 @@ def test_erreur_de_validation_reaffiche_le_formulaire(monkeypatch):
     assert 'value="Misty"' in resp.text  # la saisie n'est pas perdue
 
 
+def test_pokemon_inconnu_affiche_le_message_de_l_api(monkeypatch):
+    error = {"detail": "Pokémon inconnus : Evoli"}
+    responses = {"http://api/api/tournaments": (422, error)} | ENTRY
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
+    c = TestClient(main.app, cookies={"token": "jeton"})
+    form = {
+        "name": "Club",
+        "date": "2026-10-12",
+        "format": "M-C",
+        "detail_level": "winner",
+        "player_1": "Ash",
+        "mon_1_1": "Evoli",
+    }
+    resp = c.post("/tournaments/new", data=form)
+    assert resp.status_code == 422
+    assert "Pokémon inconnus : Evoli" in resp.text
+
+
 def test_jeton_expire_garde_la_saisie(monkeypatch):
-    responses = {"http://api/api/tournaments": (401, {"detail": "jeton invalide"})}
+    responses = {
+        "http://api/api/tournaments": (401, {"detail": "jeton invalide"})
+    } | ENTRY
     monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
     c = TestClient(main.app, cookies={"token": "vieux"})
     form = {
@@ -405,7 +468,7 @@ def test_pokemon_sans_joueur_refuse(sent):
     )
     assert resp.status_code == 422
     assert "ligne 2" in resp.text
-    assert sent == []  # rien n'est envoyé à l'API
+    assert not [u for u, *_ in sent if u.endswith("/api/tournaments")]  # rien envoyé
 
 
 def test_formulaire_d_un_autre_site_refuse(sent):
@@ -455,10 +518,12 @@ def stats_api(monkeypatch):
                 "winrate": 1.0,
             }
         ],
-        "http://api/api/stats/matchups?format=F1&pokemon=X&limit=5": [
-            {"opponent": "Z", "games": 5, "wins": 5, "losses": 0, "winrate": 1.0}
-        ],
-        "http://api/api/stats/matchups?format=F1&pokemon=Y&limit=5": [],
+        "http://api/api/stats/matchups/batch?format=F1&pokemon=X&pokemon=Y&limit=5": {
+            "X": [
+                {"opponent": "Z", "games": 5, "wins": 5, "losses": 0, "winrate": 1.0}
+            ],
+            "Y": [],
+        },
         "http://api/api/pokemon?pokemon=X&pokemon=Y": [
             {
                 "name": "X",
@@ -567,6 +632,14 @@ def test_builder_affiche_les_winrates(stats_api):
     assert '<li class="mon t-water">' in resp.text  # carte de X dans « Mon équipe »
     assert '<li class="mon">' in resp.text  # Y, sans type connu : pas de teinte
     assert "Se connecter" in resp.text  # pas connecté : pas d'enregistrement
+
+
+def test_builder_un_seul_appel_pour_les_matchups(stats_api):
+    client.get("/builder", params={"format": "F1", "p": ["X", "Y"]})
+    urls = [url for url, _, _ in stats_api[1] if "/stats/matchups" in url]
+    assert urls == [
+        "http://api/api/stats/matchups/batch?format=F1&pokemon=X&pokemon=Y&limit=5"
+    ]
 
 
 def test_builder_fiabilite_et_suggestions(stats_api):
