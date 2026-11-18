@@ -418,6 +418,11 @@ def main() -> None:
                         f"{code} : {len(matches)} matchs dans {tournaments} tournois, pas de modèle"
                         f" (minimum {MIN_MATCHES} matchs et {MIN_TOURNAMENTS} tournois)"
                     )
+                    # pas d'ancien modèle périmé (le DELETE en cascade efface aussi ses poids)
+                    cur.execute(
+                        "DELETE FROM matchup_model WHERE format_id = %s", (format_id,)
+                    )
+                    conn.commit()
                     continue
                 try:
                     r = train_format(matches)

@@ -114,7 +114,11 @@ def api_post(url: str, data: dict, token: str | None = None) -> tuple[int, dict]
             return resp.status, json.load(resp)
     except urllib.error.HTTPError as e:
         if 400 <= e.code < 500:
-            return e.code, json.loads(e.read() or b"{}")
+            try:
+                body = json.loads(e.read() or b"{}")
+            except ValueError:  # corps non JSON (page d'un proxy par exemple)
+                body = None
+            return e.code, body if isinstance(body, dict) else {"detail": "erreur"}
         raise HTTPException(502, "erreur d'un service") from e
     except (urllib.error.URLError, TimeoutError) as e:
         raise HTTPException(503, "service injoignable") from e
