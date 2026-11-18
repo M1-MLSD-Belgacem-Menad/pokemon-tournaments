@@ -16,7 +16,7 @@ run_sql() {
 # Le compte et le mot de passe sont écrits tels quels dans le SQL ci-dessous : lettres et chiffres seulement
 # (une apostrophe ou un antislash casserait la requête, ou pire).
 if [[ ! "$USER_DB_USER" =~ ^[A-Za-z0-9_]+$ || ! "$USER_DB_PASSWORD" =~ ^[A-Za-z0-9]+$ ]]; then
-  echo "USER_DB_USER et USER_DB_PASSWORD : lettres et chiffres uniquement, non vides." >&2
+  echo "Compte ou mot de passe de user_db invalide (.env) : lettres et chiffres uniquement, non vides." >&2
   exit 1
 fi
 
