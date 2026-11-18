@@ -49,7 +49,7 @@ def data(client, db):
         "date": "2026-10-02",
         "format": "F1",
         "detail_level": "winner",
-        "standings": [{"placement": 1, "player": "Zed", "team": ["V"]}],
+        "standings": [{"placement": 1, "player": "Zed", "team": ["W"]}],
     }
     assert (
         client.post("/api/tournaments", json=local, headers=auth()).status_code == 201
@@ -135,18 +135,6 @@ def test_legal_pokemon_format_with_slash(client, db):
         "Y",
         "Z",
     ]
-
-
-def test_local_formats_are_not_listed(client, data):
-    local = {
-        "name": "Futur",
-        "date": "2062-01-01",
-        "format": "Local seulement",
-        "detail_level": "winner",
-        "standings": [{"placement": 1, "player": "A"}],
-    }
-    client.post("/api/tournaments", json=local, headers=auth())
-    assert client.get("/api/formats").json()[0]["code"] == "F1"
 
 
 def test_pokemon_page(client, db):

@@ -381,6 +381,24 @@ def test_erreur_de_validation_reaffiche_le_formulaire(monkeypatch):
     assert 'value="Misty"' in resp.text  # la saisie n'est pas perdue
 
 
+def test_pokemon_inconnu_affiche_le_message_de_l_api(monkeypatch):
+    error = {"detail": "Pokémon inconnus : Evoli"}
+    responses = {"http://api/api/tournaments": (422, error)}
+    monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))
+    c = TestClient(main.app, cookies={"token": "jeton"})
+    form = {
+        "name": "Club",
+        "date": "2026-10-12",
+        "format": "M-C",
+        "detail_level": "winner",
+        "player_1": "Ash",
+        "mon_1_1": "Evoli",
+    }
+    resp = c.post("/tournaments/new", data=form)
+    assert resp.status_code == 422
+    assert "Pokémon inconnus : Evoli" in resp.text
+
+
 def test_jeton_expire_garde_la_saisie(monkeypatch):
     responses = {"http://api/api/tournaments": (401, {"detail": "jeton invalide"})}
     monkeypatch.setattr(main.urllib.request, "urlopen", fake_urlopen(responses))

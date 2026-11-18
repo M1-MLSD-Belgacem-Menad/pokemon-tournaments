@@ -2,7 +2,13 @@ import datetime
 import math
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 Name = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
@@ -65,10 +71,18 @@ class TournamentImport(BaseModel):
         return self
 
 
+def distinct_pokemon(v: list[str]) -> list[str]:
+    if len({p.lower() for p in v}) != len(v):
+        raise ValueError("un Pokémon ne peut figurer qu'une fois dans l'équipe")
+    return v
+
+
 class LocalStanding(BaseModel):
     placement: int = Field(ge=1, le=16)
     player: Name
     team: list[Name] = Field(default=[], max_length=6)
+
+    _distinct = field_validator("team")(distinct_pokemon)
 
 
 class LocalTournament(BaseModel):

@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from app import archetypes, grpc_server, matchup, stats
 from app.auth import current_user_id
 from app.db import Conn, connect, migrate
-from app.importer import get_or_create, name_ids, store_import
+from app.importer import name_ids, store_import
 from app.schemas import STATS, Enrichment, LocalTournament, TournamentImport
 
 
@@ -126,12 +126,17 @@ def create_local_tournament(
 ) -> dict[str, int]:
     """Saisie d'un tournoi local par un utilisateur connecté, en une transaction."""
     with conn.cursor() as cur:
-        format_id = get_or_create(
-            cur,
-            "INSERT INTO format (code, name) VALUES (%s, %s)"
-            " ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)",
-            (data.format, data.format),
-        )
+        cur.execute("SELECT id FROM format WHERE code = %s", (data.format,))
+        if not (row := cur.fetchone()):
+            raise HTTPException(422, f"Format inconnu : {data.format}")
+        format_id = row["id"]
+        # Comparaison sans casse, comme MySQL (collation _ci) : on ne crée jamais de Pokémon ici.
+        wanted = {n for s in data.standings for n in s.team}
+        pokemon = {
+            k.lower(): v for k, v in existing_ids(cur, "pokemon", wanted).items()
+        }
+        if unknown := sorted(n for n in wanted if n.lower() not in pokemon):
+            raise HTTPException(422, f"Pokémon inconnus : {', '.join(unknown)}")
         cur.execute(
             "INSERT INTO tournament (name, date, format_id, source, player_count, created_by, detail_level)"
             " VALUES (%s, %s, %s, 'local', %s, %s, %s)",
@@ -145,7 +150,6 @@ def create_local_tournament(
             ),
         )
         tournament_id = cur.lastrowid
-        pokemon = name_ids(cur, "pokemon", {n for s in data.standings for n in s.team})
         team_rows = []
         for s in data.standings:
             # ponytail: un joueur local est créé à chaque tournoi (pas d'identifiant commun entre deux saisies).
@@ -156,7 +160,7 @@ def create_local_tournament(
             )
             standing_id = cur.lastrowid
             team_rows += [
-                (standing_id, slot, pokemon[name])
+                (standing_id, slot, pokemon[name.lower()])
                 for slot, name in enumerate(s.team, start=1)
             ]
         cur.executemany(

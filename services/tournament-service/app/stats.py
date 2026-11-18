@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.auth import current_user_id
 from app.db import Conn
-from app.schemas import STATS, Name
+from app.schemas import STATS, Name, distinct_pokemon
 
 router = APIRouter()
 Names = Annotated[list[str], Query(alias="pokemon", max_length=6)]
@@ -292,12 +292,7 @@ class SavedTeam(BaseModel):
     format: Name
     pokemon: list[Name] = Field(min_length=1, max_length=6)
 
-    @field_validator("pokemon")
-    @classmethod
-    def distinct(cls, v: list[str]) -> list[str]:
-        if len({p.lower() for p in v}) != len(v):
-            raise ValueError("un Pokémon ne peut figurer qu'une fois dans l'équipe")
-        return v
+    _distinct = field_validator("pokemon")(distinct_pokemon)
 
 
 @router.post("/api/teams", status_code=201)
