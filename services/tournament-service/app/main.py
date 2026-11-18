@@ -2,6 +2,7 @@ import datetime
 from contextlib import asynccontextmanager
 from typing import Annotated
 
+import pymysql
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 
 from app import archetypes, grpc_server, matchup, stats
@@ -33,8 +34,23 @@ app.include_router(archetypes.router)
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    """Sonde liveness/readiness pour Kubernetes."""
+    """Sonde liveness : le processus répond, sans toucher à la base."""
     return {"status": "ok"}
+
+
+@app.get("/ready")
+def ready() -> dict[str, str]:
+    """Sonde readiness : la base répond (503 sinon, le pod sort du Service sans être redémarré)."""
+    try:
+        conn = connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+        finally:
+            conn.close()
+    except pymysql.MySQLError as e:
+        raise HTTPException(503, "base de données injoignable") from e
+    return {"status": "ready"}
 
 
 def existing_ids(cur, table: str, names: set[str]) -> dict[str, int]:
