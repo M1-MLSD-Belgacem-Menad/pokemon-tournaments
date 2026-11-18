@@ -43,18 +43,24 @@ Trois services Python et un frontend derrière une gateway Ingress : `tournament
 
 - Git
 - Docker Desktop (ou Docker Engine + plugin Compose)
-- Pour Kubernetes : minikube et kubectl
-- Python 3.12 seulement pour développer hors conteneur
+- Pour Kubernetes : minikube (testé avec la 1.39) et kubectl, Kubernetes 1.33 ou plus ; sous Windows, Git Bash pour `k8s/smoke-test.sh`
+- Python 3.12 et [uv](https://docs.astral.sh/uv/) seulement pour développer hors conteneur (tests, lint)
 
 ## Installation
 
 ```bash
-git clone https://github.com/<compte>/pokemon-tournaments.git
+git clone https://github.com/M1-MLSD-Belgacem-Menad/pokemon-tournaments.git
 cd pokemon-tournaments
 cp .env.example .env        # puis renseigner les mots de passe et la clé JWT
 ```
 
 Sous Windows PowerShell : `Copy-Item .env.example .env`.
+
+Les mots de passe ne doivent pas rester vides, et ne contenir que des lettres et des chiffres (le script d'initialisation de MySQL refuse les autres). Pour en générer un (à coller dans `.env`, un par variable ; la clé `JWT_SECRET` en demande 32 caractères au moins) :
+
+```bash
+docker run --rm python:3.12-slim python -c "import secrets; print(secrets.token_hex(16))"
+```
 
 ## Lancement avec Docker Compose (développement)
 
@@ -68,11 +74,19 @@ docker compose up --build
 | http://localhost:8001/docs | API tournois (Swagger) |
 | http://localhost:8002/docs | API utilisateurs (Swagger) |
 
+Les ports ne sont publiés que sur `127.0.0.1` : les services ne sont pas joignables depuis le reste du réseau.
+
 Lancer un scraping à la main :
 
 ```bash
 docker compose run --rm --build scraper          # tournois récents, puis types et statistiques (PokéAPI)
 docker compose run --rm --build scraper enrich   # seulement l'enrichissement PokéAPI
+```
+
+Réentraîner à la main le modèle de matchup (profil Compose `entrainement`, même image que le `tournament-service`) :
+
+```bash
+docker compose run --rm --build entrainement
 ```
 
 `--build` reconstruit l'image du scraper si son code a changé : `docker compose up --build` ne le fait pas, le scraper n'étant lancé qu'à la demande.
@@ -96,6 +110,8 @@ Les images sont tirées de Docker Hub (`belgacemmenad/pokemon-<service>`) : il f
 # Sur une machine à 8 Go : donner 6 Go à Docker Desktop (Settings > Resources) et ajouter --memory=4096.
 minikube start --cni=calico
 minikube addons enable ingress
+# Sans cette attente, le premier kubectl apply -k échoue (le webhook de l'Ingress n'est pas encore prêt).
+kubectl -n ingress-nginx rollout status deployment/ingress-nginx-controller --timeout=300s
 
 kubectl apply -f k8s/namespace.yaml
 # Mots de passe et clé JWT repris du .env de Compose : ils ne sont jamais dans le dépôt.
@@ -112,7 +128,7 @@ Au premier lancement, les pods `tournament-service` restent en `Init` le temps q
 
 L'application répond sur https://pokemon.local. Il faut faire pointer ce nom vers le cluster dans le fichier hosts (`C:\Windows\System32\drivers\etc\hosts` sous Windows, `/etc/hosts` ailleurs) : `127.0.0.1 pokemon.local` sous Windows ou macOS avec `minikube tunnel` lancé dans un autre terminal (pilote Docker), sinon l'adresse donnée par `minikube ip`. Le navigateur prévient que le certificat est auto-signé : l'accepter une fois. Le HTTP est redirigé vers le HTTPS. L'Ingress envoie `/api/auth` au `user-service`, le reste de `/api` au `tournament-service` et tout le reste au frontend ; `/internal/` (l'import) n'est pas exposé hors du cluster.
 
-Le scraper tourne chaque jour à 6 h, heure de Paris (CronJob). Pour le lancer tout de suite :
+Le scraper tourne chaque jour à 6 h, heure de Paris (CronJob), et le modèle de matchup est réentraîné à 7 h (CronJob `entrainement`). Pour lancer le scraper tout de suite :
 
 ```bash
 kubectl -n pokemon create job --from=cronjob/scraper scraper-manuel
@@ -120,7 +136,9 @@ kubectl -n pokemon logs -f job/scraper-manuel
 kubectl -n pokemon delete job scraper-manuel   # avant de le relancer
 ```
 
-Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t belgacemmenad/pokemon-tournament:0.6.0 services/tournament-service` (idem pour `pokemon-user` avec `services/user-service`, `pokemon-frontend` et `pokemon-scraper`), avant `kubectl apply -k k8s/`.
+Même principe pour l'entraînement : `kubectl -n pokemon create job --from=cronjob/entrainement entrainement-manuel`.
+
+Pour tester des images construites en local sans passer par Docker Hub : `minikube image build -t belgacemmenad/pokemon-tournament:<version> services/tournament-service` (`<version>` : celle de `k8s/kustomization.yaml` ; idem pour `pokemon-user` avec `services/user-service`, `pokemon-frontend` et `pokemon-scraper`), avant `kubectl apply -k k8s/`.
 
 ### Sécurité du cluster
 
@@ -128,7 +146,7 @@ Pour tester des images construites en local sans passer par Docker Hub : `miniku
 - Tous les conteneurs sans root (`nobody`, et `mysql` pour MySQL), avec un système de fichiers racine en lecture seule. MySQL n'écrit que dans son volume et dans trois dossiers temporaires (`emptyDir`).
 - Requêtes et limites de CPU et de mémoire sur chaque conteneur, calées sur l'usage mesuré (commentaires dans les manifestes).
 - Un ServiceAccount par service, sans aucun droit sur l'API Kubernetes (aucun service ne l'appelle) et sans jeton monté (`k8s/rbac.yaml`).
-- NetworkPolicy (`k8s/network-policies.yaml`) : tout trafic entrant est refusé, sauf MySQL depuis le `tournament-service` et le `user-service`, le `tournament-service` depuis le frontend, le scraper et l'Ingress, le `user-service` depuis le frontend et l'Ingress, le frontend depuis l'Ingress.
+- NetworkPolicy (`k8s/network-policies.yaml`) : tout trafic entrant est refusé, sauf MySQL depuis le `tournament-service`, le `user-service` et le Job `entrainement`, le `tournament-service` depuis le frontend, le scraper et l'Ingress, le `user-service` depuis le frontend et l'Ingress, le frontend depuis l'Ingress.
 - Trivy dans la CI : les manifestes rendus ne doivent avoir aucune alerte HIGH ou CRITICAL, et chaque image aucune faille HIGH ou CRITICAL qui a un correctif.
 
 Vérifications :
@@ -146,7 +164,7 @@ curl -k -X POST https://pokemon.local/internal/import
 kubectl -n pokemon exec deploy/frontend -- .venv/bin/python -c "import socket; socket.create_connection(('tournament-service', 50051), timeout=3)"
 ```
 
-Les mêmes vérifications, plus les routes de la gateway (HTTPS, redirection du HTTP, `/internal/` fermé), en une commande et sans fichier hosts ni tunnel : `k8s/smoke-test.sh`. Il marche sur n'importe quel cluster visé par `kubectl` (minikube, GKE) et renvoie un code d'erreur si une vérification échoue. La CI le lance à chaque PR sur un cluster kind jetable (job `deploy`).
+Les mêmes vérifications, plus les routes de la gateway (HTTPS, redirection du HTTP, `/internal/` fermé), en une commande et sans fichier hosts ni tunnel : `k8s/smoke-test.sh` (sous Windows, avec Git Bash : `bash k8s/smoke-test.sh`). Il marche sur n'importe quel cluster visé par `kubectl` (minikube, GKE) et renvoie un code d'erreur si une vérification échoue. La CI le lance à chaque PR sur un cluster kind jetable (job `deploy`).
 
 ## Déploiement sur GKE (Terraform)
 
@@ -216,8 +234,8 @@ kubectl config use-context minikube   # kubectl vise de nouveau minikube
 Au push d'un tag `v*`, si le lint et les tests passent, la CI construit les images et les publie sur Docker Hub avec la version du tag (`v0.1.0` donne `pokemon-tournament:0.1.0`). Chaque image existe en `amd64` (PC, GKE) et en `arm64` (Mac Apple Silicon) : Docker et Kubernetes tirent automatiquement la variante du processeur. Il faut une fois les secrets GitHub `DOCKERHUB_USERNAME` (le compte Docker Hub en minuscules, le même que dans `k8s/kustomization.yaml`) et `DOCKERHUB_TOKEN` (*Settings > Secrets and variables > Actions*).
 
 ```bash
-git tag v0.6.0
-git push origin v0.6.0
+git tag v<version>        # par exemple v0.8.0, comme dans k8s/kustomization.yaml
+git push origin v<version>
 ```
 
 ## Usage
@@ -239,6 +257,8 @@ uv sync
 uv run pytest
 docker stop mysql-test
 ```
+
+Sous Windows, les tests gRPC du `tournament-service` échouent si le chemin du dossier du projet contient un caractère non ASCII (accent, par exemple) : cloner le dépôt dans un dossier au chemin simple.
 
 ## Décisions de cadrage (14 octobre 2026)
 
