@@ -34,7 +34,7 @@ METRICS = (
     "teams_help",
 )
 # Pokémon des équipes du format, dans les tournois scrapés (ceux qui ont des listes d'équipes et des bilans).
-FORMAT_TEAMS = (
+FORMAT_TEAMS_SCRAPED = (
     " FROM team_pokemon tp JOIN standing s ON s.id = tp.standing_id"
     " JOIN tournament t ON t.id = s.tournament_id JOIN format f ON f.id = t.format_id"
     " JOIN pokemon pk ON pk.id = tp.pokemon_id"
@@ -86,9 +86,11 @@ def predict(conn: Conn, format: str, a: Team, b: Team) -> dict:
     """
     with conn.cursor() as cur:
         model, weights = load_model(cur, format)
+    # Comparaison sans casse, comme save_team.
+    canon = {name.lower(): name for name in weights}
     a, b = (
-        list(dict.fromkeys(a)),
-        list(dict.fromkeys(b)),
+        list(dict.fromkeys(canon.get(p.lower(), p) for p in a)),
+        list(dict.fromkeys(canon.get(p.lower(), p) for p in b)),
     )  # un doublon ne compte qu'une fois
     score = sum(weights.get(p, 0) for p in a) - sum(weights.get(p, 0) for p in b)
     rows = [
@@ -117,7 +119,7 @@ def format_teams(cur, format_code: str) -> dict[int, set[str]]:
     """
     cur.execute(
         "SELECT tp.standing_id AS id, pk.name"
-        + FORMAT_TEAMS
+        + FORMAT_TEAMS_SCRAPED
         + " ORDER BY COALESCE(s.wins, 0), t.date, s.id",
         (format_code,),
     )
@@ -166,11 +168,12 @@ def suggestions(
     `partners` : pour chaque Pokémon choisi, part de ses équipes qui jouent aussi le candidat et winrate
     de ces équipes, à titre indicatif (il ne sert pas au classement).
     """
-    chosen = list(dict.fromkeys(pokemon))
     with conn.cursor() as cur:
         teams = format_teams(cur, format)
         total = len(teams)
         alone = Counter(p for t in teams.values() for p in t)
+        canon = {name.lower(): name for name in alone}  # comparaison sans casse
+        chosen = list(dict.fromkeys(canon.get(p.lower(), p) for p in pokemon))
         where, args = in_names("pp.name", chosen)
         cur.execute(
             "SELECT pc.name AS candidate, pp.name AS partner, COUNT(*) AS teams,"

@@ -13,6 +13,13 @@ run_sql() {
   fi
 }
 
+# Le compte et le mot de passe sont écrits tels quels dans le SQL ci-dessous : lettres et chiffres seulement
+# (une apostrophe ou un antislash casserait la requête, ou pire).
+if [[ ! "$USER_DB_USER" =~ ^[A-Za-z0-9_]+$ || ! "$USER_DB_PASSWORD" =~ ^[A-Za-z0-9]+$ ]]; then
+  echo "Compte ou mot de passe de user_db invalide (.env) : lettres et chiffres uniquement, non vides." >&2
+  exit 1
+fi
+
 run_sql <<SQL
 CREATE DATABASE IF NOT EXISTS user_db;
 CREATE USER IF NOT EXISTS '$USER_DB_USER'@'%' IDENTIFIED BY '$USER_DB_PASSWORD';

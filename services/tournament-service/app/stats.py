@@ -227,7 +227,7 @@ def matchup_stats(
 
 
 # Équipes du format qui ont un bilan (tournois scrapés) : base de la fiche et de son taux d'usage.
-FORMAT_TEAMS = (
+FORMAT_TEAMS_RECORDED = (
     " FROM team_pokemon tp JOIN standing s ON s.id = tp.standing_id"
     " JOIN tournament t ON t.id = s.tournament_id JOIN format f ON f.id = t.format_id"
     " WHERE f.code = %s AND s.wins IS NOT NULL"
@@ -236,7 +236,7 @@ FORMAT_TEAMS = (
 MINE = (
     "WITH mine AS (SELECT tp.id, tp.standing_id, tp.pokemon_id, tp.item_id, tp.ability_id,"
     " s.wins, s.losses"
-    + FORMAT_TEAMS
+    + FORMAT_TEAMS_RECORDED
     + " AND tp.pokemon_id = (SELECT id FROM pokemon WHERE name = %s)) "
 )
 # Par liste de la fiche : nombre d'équipes (pas de lignes) qui ont chaque talent, objet, attaque, coéquipier.
@@ -274,7 +274,8 @@ def pokemon_page(name: str, conn: Conn, format: str) -> dict:
             raise HTTPException(404, f"{name} n'a pas été joué en {format}")
         teams = page["teams"]
         cur.execute(
-            "SELECT COUNT(DISTINCT tp.standing_id) AS n" + FORMAT_TEAMS, (format,)
+            "SELECT COUNT(DISTINCT tp.standing_id) AS n" + FORMAT_TEAMS_RECORDED,
+            (format,),
         )
         page["format_teams"] = cur.fetchone()["n"]
         page["usage"] = round(teams / page["format_teams"], 4)

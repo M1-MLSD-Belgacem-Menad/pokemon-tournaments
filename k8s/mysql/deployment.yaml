@@ -61,11 +61,26 @@ spec:
                 secretKeyRef: { name: app-secrets, key: USER_DB_PASSWORD }
           ports:
             - containerPort: 3306
+          # Sondes en TCP (127.0.0.1) : pendant l'initdb du premier démarrage, le serveur temporaire n'écoute
+          # que sur son socket et ne doit pas être déclaré prêt.
+          # Premier démarrage (initdb) : jusqu'à 10 minutes avant que la sonde de démarrage échoue.
+          startupProbe:
+            exec:
+              command: ["sh", "-c", "MYSQL_PWD=\"$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -uroot"]
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 120
           readinessProbe:
             exec:
               command: ["sh", "-c", "MYSQL_PWD=\"$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -uroot"]
             periodSeconds: 5
             timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "MYSQL_PWD=\"$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -uroot"]
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
           volumeMounts:
             - name: data
               mountPath: /var/lib/mysql

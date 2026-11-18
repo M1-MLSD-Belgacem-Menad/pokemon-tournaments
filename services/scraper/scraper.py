@@ -117,7 +117,7 @@ def parse_pairings(pairings):
 
 
 def build_payload(tournament_id, details, standings, pairings):
-    """Assemble le JSON attendu par POST /internal/import du tournament-service."""
+    """Assemble le JSON envoyé au tournament-service par gRPC (TournamentImporter.Import)."""
     ranked = parse_standings(standings)
     matches = parse_pairings(pairings)
     needed = {s["player"] for s in ranked} | {

@@ -51,7 +51,7 @@ def migrate(conn: pymysql.Connection) -> None:
                 # Pas de ";" dans les commentaires des fichiers de migration.
                 # ponytail: MySQL valide chaque CREATE/ALTER aussitôt, un fichier qui échoue à moitié
                 # reste à moitié appliqué : corriger la base à la main (ou `docker compose down -v` en dev).
-                for statement in path.read_text().split(";"):
+                for statement in path.read_text(encoding="utf-8").split(";"):
                     if statement.strip():
                         cur.execute(statement)
                 cur.execute(
