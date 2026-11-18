@@ -13,6 +13,13 @@ run_sql() {
   fi
 }
 
+# Le mot de passe est écrit tel quel dans le SQL ci-dessous : lettres et chiffres seulement
+# (une apostrophe ou un antislash casserait la requête, ou pire).
+if [[ ! "$USER_DB_PASSWORD" =~ ^[A-Za-z0-9]+$ ]]; then
+  echo "USER_DB_PASSWORD doit contenir uniquement des lettres et des chiffres (et ne pas être vide)." >&2
+  exit 1
+fi
+
 run_sql <<SQL
 CREATE DATABASE IF NOT EXISTS user_db;
 CREATE USER IF NOT EXISTS '$USER_DB_USER'@'%' IDENTIFIED BY '$USER_DB_PASSWORD';
