@@ -31,7 +31,7 @@ services:
       mysql:
         condition: service_healthy
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"  # le poste seulement : pas d'accès depuis le réseau
     healthcheck:
       test: ["CMD", ".venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 5s
@@ -50,7 +50,12 @@ services:
       mysql:
         condition: service_healthy
     ports:
-      - "8002:8000"
+      - "127.0.0.1:8002:8000"
+    healthcheck:
+      test: ["CMD", ".venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   frontend:
     build: services/frontend
@@ -61,9 +66,14 @@ services:
       tournament-service:
         condition: service_healthy
       user-service:
-        condition: service_started
+        condition: service_healthy
     ports:
-      - "8080:8000"
+      - "127.0.0.1:8080:8000"
+    healthcheck:
+      test: ["CMD", ".venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   # Tâche ponctuelle : `docker compose run --rm scraper` (le profil évite qu'elle tourne à chaque `up`).
   scraper:
@@ -75,6 +85,21 @@ services:
       SCRAPE_LIMIT: ${SCRAPE_LIMIT:-5}
     depends_on:
       tournament-service:
+        condition: service_healthy
+
+  # Réentraînement du modèle de matchup : `docker compose run --rm entrainement` (profil, comme le scraper).
+  # Même image que l'API, autre commande ; sur Kubernetes, c'est le CronJob `entrainement`.
+  entrainement:
+    build: services/tournament-service
+    profiles: [entrainement]
+    command: [".venv/bin/python", "-m", "app.train"]
+    environment:
+      DB_HOST: mysql
+      DB_USER: ${TOURNAMENT_DB_USER}
+      DB_PASSWORD: ${TOURNAMENT_DB_PASSWORD}
+      DB_NAME: tournament_db
+    depends_on:
+      mysql:
         condition: service_healthy
 
 volumes:
