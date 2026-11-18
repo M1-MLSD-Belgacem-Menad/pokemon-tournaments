@@ -43,7 +43,7 @@ Trois services Python et un frontend derrière une gateway Ingress : `tournament
 
 - Git
 - Docker Desktop (ou Docker Engine + plugin Compose)
-- Pour Kubernetes : minikube (testé avec la 1.39) et kubectl, Kubernetes 1.33 ou plus ; sous Windows, Git Bash pour `k8s/smoke-test.sh`
+- Pour Kubernetes : minikube (testé avec la 1.39) et kubectl ; sous Windows, Git Bash pour `k8s/smoke-test.sh`
 - Python 3.12 et [uv](https://docs.astral.sh/uv/) seulement pour développer hors conteneur (tests, lint)
 
 ## Installation
@@ -61,6 +61,8 @@ Les mots de passe ne doivent pas rester vides, et ne contenir que des lettres et
 ```bash
 docker run --rm python:3.12-slim python -c "import secrets; print(secrets.token_hex(16))"
 ```
+
+Si MySQL refuse un mot de passe au premier démarrage, son volume reste à moitié initialisé et l'initialisation n'est pas refaite : corriger `.env`, puis `docker compose down -v` (sur Kubernetes, supprimer le namespace `pokemon`, ce qui supprime aussi le volume).
 
 ## Lancement avec Docker Compose (développement)
 

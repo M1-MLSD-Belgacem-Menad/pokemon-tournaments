@@ -13,10 +13,10 @@ run_sql() {
   fi
 }
 
-# Le mot de passe est écrit tel quel dans le SQL ci-dessous : lettres et chiffres seulement
+# Le compte et le mot de passe sont écrits tels quels dans le SQL ci-dessous : lettres et chiffres seulement
 # (une apostrophe ou un antislash casserait la requête, ou pire).
-if [[ ! "$USER_DB_PASSWORD" =~ ^[A-Za-z0-9]+$ ]]; then
-  echo "USER_DB_PASSWORD doit contenir uniquement des lettres et des chiffres (et ne pas être vide)." >&2
+if [[ ! "$USER_DB_USER" =~ ^[A-Za-z0-9_]+$ || ! "$USER_DB_PASSWORD" =~ ^[A-Za-z0-9]+$ ]]; then
+  echo "USER_DB_USER et USER_DB_PASSWORD : lettres et chiffres uniquement, non vides." >&2
   exit 1
 fi
 

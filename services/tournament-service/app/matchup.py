@@ -86,9 +86,8 @@ def predict(conn: Conn, format: str, a: Team, b: Team) -> dict:
     """
     with conn.cursor() as cur:
         model, weights = load_model(cur, format)
-    canon = {
-        name.lower(): name for name in weights
-    }  # comparaison sans casse, comme save_team
+    # Comparaison sans casse, comme save_team.
+    canon = {name.lower(): name for name in weights}
     a, b = (
         list(dict.fromkeys(canon.get(p.lower(), p) for p in a)),
         list(dict.fromkeys(canon.get(p.lower(), p) for p in b)),

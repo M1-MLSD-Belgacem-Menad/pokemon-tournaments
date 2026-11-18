@@ -99,7 +99,8 @@ services:
       DB_PASSWORD: ${TOURNAMENT_DB_PASSWORD}
       DB_NAME: tournament_db
     depends_on:
-      mysql:
+      # Les migrations sont faites au démarrage du tournament-service.
+      tournament-service:
         condition: service_healthy
 
 volumes:
