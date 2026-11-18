@@ -473,10 +473,12 @@ def stats_api(monkeypatch):
                 "winrate": 1.0,
             }
         ],
-        "http://api/api/stats/matchups?format=F1&pokemon=X&limit=5": [
-            {"opponent": "Z", "games": 5, "wins": 5, "losses": 0, "winrate": 1.0}
-        ],
-        "http://api/api/stats/matchups?format=F1&pokemon=Y&limit=5": [],
+        "http://api/api/stats/matchups/batch?format=F1&pokemon=X&pokemon=Y&limit=5": {
+            "X": [
+                {"opponent": "Z", "games": 5, "wins": 5, "losses": 0, "winrate": 1.0}
+            ],
+            "Y": [],
+        },
         "http://api/api/pokemon?pokemon=X&pokemon=Y": [
             {
                 "name": "X",
@@ -585,6 +587,14 @@ def test_builder_affiche_les_winrates(stats_api):
     assert '<li class="mon t-water">' in resp.text  # carte de X dans « Mon équipe »
     assert '<li class="mon">' in resp.text  # Y, sans type connu : pas de teinte
     assert "Se connecter" in resp.text  # pas connecté : pas d'enregistrement
+
+
+def test_builder_un_seul_appel_pour_les_matchups(stats_api):
+    client.get("/builder", params={"format": "F1", "p": ["X", "Y"]})
+    urls = [url for url, _, _ in stats_api[1] if "/stats/matchups" in url]
+    assert urls == [
+        "http://api/api/stats/matchups/batch?format=F1&pokemon=X&pokemon=Y&limit=5"
+    ]
 
 
 def test_builder_fiabilite_et_suggestions(stats_api):

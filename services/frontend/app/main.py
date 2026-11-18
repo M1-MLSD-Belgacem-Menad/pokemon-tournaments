@@ -329,12 +329,8 @@ def builder_page(request: Request, fmt: str | None, chosen: list[str], **extra):
             }
             ctx["stats"] = api_get(f"/api/stats/pokemon?{q}")
             ctx["pairs"] = api_get(f"/api/stats/combinations?{q}")
-            ctx["matchups"] = {
-                p: api_get(
-                    f"/api/stats/matchups?{urlencode({'format': fmt, 'pokemon': p, 'limit': 5})}"
-                )
-                for p in chosen
-            }
+            q5 = urlencode({"format": fmt, "pokemon": chosen, "limit": 5}, doseq=True)
+            ctx["matchups"] = api_get(f"/api/stats/matchups/batch?{q5}")
             if len(chosen) < TEAM_SIZE:
                 ctx["suggestions"] = suggestions(fmt, chosen)
             ctx["archetype"] = optional(f"/api/archetypes/match?{q}")

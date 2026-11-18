@@ -56,13 +56,14 @@ Préfixes routés par la gateway. Les routes en écriture exigent un jeton.
 |---|---|---|---|
 | GET | `/api/tournaments` | tournament | Liste (filtres : format, date, source) |
 | GET | `/api/tournaments/{id}` | tournament | Détail + classement + équipes |
-| POST | `/api/tournaments` | tournament | Saisie d'un tournoi local (F-04), jeton requis |
+| POST | `/api/tournaments` | tournament | Saisie d'un tournoi local (F-04), jeton requis ; format et Pokémon déjà connus de la base (422 sinon), sans doublon dans une équipe |
 | GET | `/api/pokemon?pokemon=…` | tournament | Types et statistiques de base (PokéAPI) des Pokémon demandés (6 au plus) |
 | GET | `/api/formats` | tournament | Formats joués, le plus récent (format courant) en premier |
 | GET | `/api/formats/{code}/legal-pokemon` | tournament | Pokémon légaux (F-05) : ceux joués dans les tournois scrapés du format |
 | GET | `/api/stats/pokemon` | tournament | Taux d'usage et winrate par Pokémon |
 | GET | `/api/stats/combinations` | tournament | Winrate par combinaison (F-06) |
 | GET | `/api/stats/matchups` | tournament | Winrate par matchup (F-06), si les données de matchs existent |
+| GET | `/api/stats/matchups/batch?format=&pokemon=…` | tournament | Winrate par matchup de plusieurs Pokémon (6 au plus) en un appel : `{nom: lignes}`, utilisé par le créateur d'équipe |
 | GET | `/api/stats/pokemon/{nom}?format=` | tournament | Fiche d'un Pokémon : usage, winrate, talents, objets, attaques et coéquipiers les plus joués (part des équipes, de 0 à 1) |
 | POST | `/api/teams` | tournament | Enregistrer une équipe construite (étape 3), jeton requis, Pokémon légaux seulement |
 | GET | `/api/teams` | tournament | Équipes de l'utilisateur du jeton |
@@ -71,7 +72,8 @@ Préfixes routés par la gateway. Les routes en écriture exigent un jeton.
 | POST | `/api/auth/register` | user | Inscription |
 | POST | `/api/auth/login` | user | Connexion, renvoie un JWT |
 | GET | `/api/auth/me` | user | Profil courant |
-| GET | `/health` | tous | Sonde liveness/readiness Kubernetes |
+| GET | `/health` | tournament, user | Sonde liveness Kubernetes, sans accès à la base |
+| GET | `/ready` | tournament, user | Sonde readiness : `SELECT 1` sur la base, 503 si elle ne répond pas |
 
 **[Reco] Authentification** : le `user-service` signe un JWT (bibliothèque PyJWT) avec une clé stockée dans un Secret Kubernetes. Le `tournament-service` vérifie la signature avec la même clé, sans appel réseau. Mots de passe hachés avec `bcrypt`.
 
@@ -227,7 +229,7 @@ k8s/
 - Services Kubernetes en `ClusterIP` ; seul l'Ingress est exposé.
 - Mots de passe MySQL et clé JWT dans des **Secrets**, jamais dans le dépôt.
 - MySQL avec un **PersistentVolumeClaim** (T-08 « système de fichiers »).
-- Sondes `readinessProbe` / `livenessProbe` sur `/health`.
+- Sondes : `livenessProbe` sur `/health` (sans base), `readinessProbe` sur `/ready` (base jointe).
 - Images `utilisateur/pokemon-<service>:<version>` sur Docker Hub (T-05, V-04).
 
 ### Sécurité (palier 18/20)

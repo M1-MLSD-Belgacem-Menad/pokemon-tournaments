@@ -188,6 +188,37 @@ def combination_stats(
         return [winrate(r) for r in cur.fetchall()]
 
 
+def matchups_of(cur, format: str, pokemon: str, limit: int) -> list[dict]:
+    """Matchs gagnés par les équipes avec `pokemon`, contre chaque Pokémon de l'équipe adverse.
+
+    Seuls comptent les matchs avec un vainqueur où les deux équipes sont connues.
+    """
+    cur.execute(
+        # Les deux CTE ne gardent que les tournois du format demandé.
+        "WITH fmt AS ("
+        "  SELECT t.id FROM tournament t JOIN format f ON f.id = t.format_id WHERE f.code = %s),"
+        " side AS ("
+        "  SELECT tournament_id, player1_id AS me, player2_id AS opp, winner_id FROM game_match"
+        "  WHERE player2_id IS NOT NULL AND winner_id IS NOT NULL AND tournament_id IN (SELECT id FROM fmt)"
+        "  UNION ALL"
+        "  SELECT tournament_id, player2_id, player1_id, winner_id FROM game_match"
+        "  WHERE player2_id IS NOT NULL AND winner_id IS NOT NULL AND tournament_id IN (SELECT id FROM fmt)),"
+        " team AS ("
+        "  SELECT s.tournament_id, s.player_id, tp.pokemon_id FROM standing s"
+        "  JOIN team_pokemon tp ON tp.standing_id = s.id WHERE s.tournament_id IN (SELECT id FROM fmt))"
+        " SELECT pb.name AS opponent, COUNT(*) AS games,"
+        " SUM(side.winner_id = side.me) AS wins, SUM(side.winner_id = side.opp) AS losses"
+        " FROM side"
+        " JOIN team ta ON ta.tournament_id = side.tournament_id AND ta.player_id = side.me"
+        " JOIN team tb ON tb.tournament_id = side.tournament_id AND tb.player_id = side.opp"
+        " JOIN pokemon pa ON pa.id = ta.pokemon_id JOIN pokemon pb ON pb.id = tb.pokemon_id"
+        " WHERE pa.name = %s"
+        " GROUP BY pb.id, pb.name ORDER BY games DESC, pb.name LIMIT %s",
+        (format, pokemon, limit),
+    )
+    return [winrate(r) for r in cur.fetchall()]
+
+
 @router.get("/api/stats/matchups")
 def matchup_stats(
     conn: Conn,
@@ -195,35 +226,20 @@ def matchup_stats(
     pokemon: str,
     limit: Annotated[int, Query(ge=1, le=500)] = 20,
 ) -> list[dict]:
-    """Matchs gagnés par les équipes avec `pokemon`, contre chaque Pokémon de l'équipe adverse.
-
-    Seuls comptent les matchs avec un vainqueur où les deux équipes sont connues.
-    """
     with conn.cursor() as cur:
-        cur.execute(
-            # Les deux CTE ne gardent que les tournois du format demandé.
-            "WITH fmt AS ("
-            "  SELECT t.id FROM tournament t JOIN format f ON f.id = t.format_id WHERE f.code = %s),"
-            " side AS ("
-            "  SELECT tournament_id, player1_id AS me, player2_id AS opp, winner_id FROM game_match"
-            "  WHERE player2_id IS NOT NULL AND winner_id IS NOT NULL AND tournament_id IN (SELECT id FROM fmt)"
-            "  UNION ALL"
-            "  SELECT tournament_id, player2_id, player1_id, winner_id FROM game_match"
-            "  WHERE player2_id IS NOT NULL AND winner_id IS NOT NULL AND tournament_id IN (SELECT id FROM fmt)),"
-            " team AS ("
-            "  SELECT s.tournament_id, s.player_id, tp.pokemon_id FROM standing s"
-            "  JOIN team_pokemon tp ON tp.standing_id = s.id WHERE s.tournament_id IN (SELECT id FROM fmt))"
-            " SELECT pb.name AS opponent, COUNT(*) AS games,"
-            " SUM(side.winner_id = side.me) AS wins, SUM(side.winner_id = side.opp) AS losses"
-            " FROM side"
-            " JOIN team ta ON ta.tournament_id = side.tournament_id AND ta.player_id = side.me"
-            " JOIN team tb ON tb.tournament_id = side.tournament_id AND tb.player_id = side.opp"
-            " JOIN pokemon pa ON pa.id = ta.pokemon_id JOIN pokemon pb ON pb.id = tb.pokemon_id"
-            " WHERE pa.name = %s"
-            " GROUP BY pb.id, pb.name ORDER BY games DESC, pb.name LIMIT %s",
-            (format, pokemon, limit),
-        )
-        return [winrate(r) for r in cur.fetchall()]
+        return matchups_of(cur, format, pokemon, limit)
+
+
+@router.get("/api/stats/matchups/batch")
+def matchup_stats_batch(
+    conn: Conn,
+    format: str,
+    pokemon: Annotated[list[str], Query(min_length=1, max_length=6)],
+    limit: Annotated[int, Query(ge=1, le=500)] = 20,
+) -> dict[str, list[dict]]:
+    """Comme /api/stats/matchups pour plusieurs Pokémon d'un coup : {nom: lignes} (équipe de 6 au plus)."""
+    with conn.cursor() as cur:
+        return {p: matchups_of(cur, format, p, limit) for p in dict.fromkeys(pokemon)}
 
 
 # Équipes du format qui ont un bilan (tournois scrapés) : base de la fiche et de son taux d'usage.
