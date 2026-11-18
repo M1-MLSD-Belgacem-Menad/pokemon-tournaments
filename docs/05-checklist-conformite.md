@@ -14,7 +14,7 @@
 - [x] T-07 Deux services communiquent entre eux dans le cluster (frontend vers les deux API, scraper vers tournament-service)
 - [x] T-08, T-14 MySQL tourne dans le cluster (ou dans un cloud) avec un volume persistant (données conservées après suppression du pod, 15 oct.)
 - [x] T-10 Sécurité : RBAC, et au moins un parmi mTLS, sécurisation du registre, HTTPS, outil de contrôle (RBAC, NetworkPolicy, HTTPS, non-root : vérifications du README passées le 15 oct.)
-- [ ] T-11 Déploiement cloud (bonus) **[Terraform GKE prêt ; `terraform apply` et capture par Menad]**
+- [x] T-11 Déploiement cloud (bonus) : cluster GKE créé par Terraform, `k8s/smoke-test.sh` vert sur GKE le 18 nov., captures `docs/rapport/gke-*.png`, cluster détruit ensuite
 - [x] T-16 Tout le code est sur GitHub
 - [x] T-17 Les résultats viennent d'un scraper en Python
 - [x] T-19 Pas de dépendance injustifiée (chaque bibliothèque des `pyproject.toml` sert) (vérifié le 14 oct.)

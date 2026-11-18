@@ -10,13 +10,13 @@ variable "zone" {
 }
 
 variable "machine_type" {
-  description = "Type des nœuds : 2 vCPU et 4 Go suffisent pour MySQL, les 3 services et ingress-nginx"
+  description = "Type des nœuds : 2 vCPU partagés et 4 Go par nœud"
   type        = string
   default     = "e2-medium"
 }
 
 variable "node_count" {
-  description = "Nombre de nœuds"
+  description = "Nombre de nœuds : avec 2, les pods système de GKE laissent des pods de l'application en Pending faute de CPU"
   type        = number
-  default     = 2
+  default     = 3
 }
