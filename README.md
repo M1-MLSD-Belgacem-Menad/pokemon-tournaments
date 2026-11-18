@@ -152,7 +152,7 @@ Les mêmes vérifications, plus les routes de la gateway (HTTPS, redirection du 
 
 Palier « cloud » : `infra/gke/` crée un cluster Google Kubernetes Engine avec Terraform, puis on y applique **les mêmes manifestes** que sur minikube. Seul le cluster change : les NetworkPolicy sont appliquées par Dataplane V2 (à la place de Calico), et la gateway reçoit une IP publique (Service `LoadBalancer`).
 
-Il faut un projet Google Cloud avec la facturation activée (crédits d'essai ou des labs), et les images de la version de `k8s/kustomization.yaml` publiées sur [Docker Hub](#publier-une-version). Coût indicatif : deux nœuds `e2-medium`, un équilibreur de charge et un disque, soit quelques euros par jour. Le plan de contrôle d'un cluster zonal est couvert par le crédit mensuel gratuit de GKE. **Détruire le cluster après les captures** : tant qu'il tourne, l'application est joignable depuis Internet.
+Il faut un projet Google Cloud avec la facturation activée (crédits d'essai ou des labs), et les images de la version de `k8s/kustomization.yaml` publiées sur [Docker Hub](#publier-une-version). Coût indicatif : trois nœuds `e2-medium`, un équilibreur de charge et des disques, soit environ 0,15 $ de l'heure (moins de 1 $ pour une séance de captures). Avec deux nœuds, les pods système de GKE laissent trop peu de CPU et des pods restent en `Pending`. Le plan de contrôle d'un cluster zonal est couvert par le crédit mensuel gratuit de GKE. **Détruire le cluster après les captures** : tant qu'il tourne, l'application est joignable depuis Internet.
 
 Sous Windows (PowerShell), une seule fois, installer les outils :
 
@@ -164,9 +164,12 @@ winget install Google.CloudSDK
 Puis, dans une **nouvelle** fenêtre PowerShell (pour que `gcloud` et `terraform` soient trouvés), depuis la racine du dépôt :
 
 ```powershell
-gcloud components install gke-gcloud-auth-plugin kubectl
+gcloud components install gke-gcloud-auth-plugin kubectl   # relancer dans un PowerShell administrateur si elle échoue faute de droits
 gcloud auth login
 gcloud auth application-default login   # identifiants utilisés par Terraform
+gcloud auth application-default set-quota-project <id-du-projet>
+# Projet neuf : Terraform a besoin de ces deux API pour activer celle de GKE.
+gcloud services enable cloudresourcemanager.googleapis.com serviceusage.googleapis.com --project <id-du-projet>
 cd infra\gke
 Copy-Item terraform.tfvars.example terraform.tfvars
 ```
