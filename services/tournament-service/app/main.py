@@ -146,7 +146,7 @@ def create_local_tournament(
         if not (row := cur.fetchone()):
             raise HTTPException(422, f"Format inconnu : {data.format}")
         format_id = row["id"]
-        # Comparaison sans casse, comme MySQL (collation _ci) : on ne crée jamais de Pokémon ici.
+        # Comparaison sans casse : on ne crée jamais de Pokémon ici.
         wanted = {n for s in data.standings for n in s.team}
         pokemon = {
             k.lower(): v for k, v in existing_ids(cur, "pokemon", wanted).items()

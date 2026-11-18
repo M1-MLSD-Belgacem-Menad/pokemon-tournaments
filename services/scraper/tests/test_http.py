@@ -46,8 +46,10 @@ def test_429_attend_retry_after_puis_reessaie_une_fois(http):
         ({}, 10),  # sans en-tête : défaut
         ({"Retry-After": "600"}, 60),  # plafonné
         ({"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}, 10),  # date : défaut
+        ({"Retry-After": "inf"}, 10),  # non fini : défaut
+        ({"Retry-After": "nan"}, 10),
     ],
-    ids=["defaut", "plafond", "date"],
+    ids=["defaut", "plafond", "date", "inf", "nan"],
 )
 def test_429_duree_d_attente(http, headers, wait):
     sleeps, _, queue = http

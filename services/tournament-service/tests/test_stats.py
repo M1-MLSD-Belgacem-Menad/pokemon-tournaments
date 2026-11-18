@@ -137,6 +137,21 @@ def test_legal_pokemon_format_with_slash(client, db):
     ]
 
 
+def test_local_formats_are_not_listed(client, data):
+    local = {
+        "name": "Futur",
+        "date": "2062-01-01",
+        "format": "F2",
+        "detail_level": "winner",
+        "standings": [{"placement": 1, "player": "A"}],
+    }
+    assert (
+        client.post("/api/tournaments", json=local, headers=auth()).status_code == 201
+    )
+    # Le tournoi local, plus récent, ne change ni la liste ni l'ordre des formats.
+    assert [f["code"] for f in client.get("/api/formats").json()] == ["F1", "F2"]
+
+
 def test_pokemon_page(client, db):
     t = tournament("https://x/page")
     a, b = t["standings"][0]["team"], t["standings"][1]["team"]  # a [X, Y], b [X, Z]

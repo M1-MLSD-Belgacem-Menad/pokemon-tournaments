@@ -12,6 +12,7 @@ La base sert de cache : un nom enrichi n'est plus jamais redemandé.
 """
 
 import datetime
+import math
 import os
 import re
 import sys
@@ -36,7 +37,7 @@ def retry_after(resp):
         wait = float(resp.headers.get("Retry-After", RETRY_DEFAULT))
     except ValueError:  # Retry-After peut être une date : on prend la valeur par défaut
         wait = RETRY_DEFAULT
-    return min(max(wait, 0), RETRY_MAX)
+    return min(max(wait, 0), RETRY_MAX) if math.isfinite(wait) else RETRY_DEFAULT
 
 
 def get_json(url, delay, params=None, missing_ok=False):
