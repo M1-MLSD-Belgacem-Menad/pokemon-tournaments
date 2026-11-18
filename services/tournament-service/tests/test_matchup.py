@@ -276,3 +276,21 @@ def test_similar_teams(client, db):
     assert rows[0]["player"] == "F4-p0" and rows[0]["placement"] == 1
     assert (rows[0]["wins"], rows[0]["losses"], rows[0]["tournament"]) == (3, 2, "F4")
     assert client.get("/api/similar-teams?format=F4&pokemon=Z").json() == []
+
+
+def test_predict_and_suggestions_ignore_case(client, model):
+    exact = client.get("/api/predict?format=F1&a=Fort&b=Faible").json()
+    lower = client.get("/api/predict?format=F1&a=fort&a=FORT&b=faible").json()
+    assert lower["probability"] == exact["probability"]
+    assert all(r["known"] for r in lower["pokemon"])
+    exact = client.get("/api/suggestions?format=F1&pokemon=Fort").json()
+    lower = client.get("/api/suggestions?format=F1&pokemon=fort&pokemon=FORT").json()
+    assert [r["pokemon"] for r in lower] == [r["pokemon"] for r in exact]
+    assert "Fort" not in [r["pokemon"] for r in lower]
+
+
+def test_format_under_threshold_loses_its_old_model(client, model, monkeypatch):
+    assert client.get("/api/model?format=F1").status_code == 200
+    monkeypatch.setattr(train, "MIN_MATCHES", 10_000)
+    train.main()
+    assert client.get("/api/model?format=F1").status_code == 404

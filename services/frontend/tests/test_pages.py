@@ -823,3 +823,12 @@ def test_builder_pas_d_archetype_net(stats_api):
     }
     resp = client.get("/builder", params={"format": "F1", "p": ["X", "Y"]}).text
     assert "Pas d'archétype net" in resp and "La plus proche : Y / Z." in resp
+
+
+@pytest.mark.parametrize("raw", [b"<html>Bad Request</html>", b"[1, 2]"])
+def test_erreur_4xx_sans_json_objet(monkeypatch, raw):
+    def refuse(req, timeout):
+        raise urllib.error.HTTPError(req.full_url, 400, "Bad", {}, io.BytesIO(raw))
+
+    monkeypatch.setattr(main.urllib.request, "urlopen", refuse)
+    assert main.api_post("http://api/x", {}) == (400, {"detail": "erreur"})

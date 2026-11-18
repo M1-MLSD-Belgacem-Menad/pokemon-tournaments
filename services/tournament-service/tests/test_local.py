@@ -5,10 +5,10 @@ import jwt
 import pytest
 
 
-def auth(user_id="7", secret=None):
-    exp = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
+def auth(user_id="7", secret=None, hours=1, claims=None):
+    exp = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=hours)
     token = jwt.encode(
-        {"sub": user_id, "exp": exp},
+        claims if claims is not None else {"sub": user_id, "exp": exp},
         secret or os.environ["JWT_SECRET"],
         algorithm="HS256",
     )
@@ -70,8 +70,14 @@ def test_winner_only(client, db):
         {},
         {"Authorization": "Bearer pas-un-jeton"},
         auth(secret="autre-cle-" + "y" * 32),
+        auth(hours=-1),
+        auth(
+            claims={
+                "exp": datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
+            }
+        ),
     ],
-    ids=["sans-jeton", "illisible", "mauvaise-cle"],
+    ids=["sans-jeton", "illisible", "mauvaise-cle", "expire", "sans-sub"],
 )
 def test_requires_valid_token_401(client, db, headers):
     assert (
